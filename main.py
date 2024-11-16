@@ -1,0 +1,122 @@
+from random import randrange, choices
+from string import ascii_lowercase
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+from transformers import LlamaForCausalLM, AutoTokenizer, BitsAndBytesConfig
+torch.manual_seed(42)
+import time
+from constants import VERBOSE_CODE
+from utils import profile_time 
+
+"""
+TASKS
+
+// create a dataset generator
+// create a dataloader
+create a datacollator
+bitsandbytes config
+complete loading of model 
+
+"""
+
+
+HUGGINGFACE_MODEL = "amd/AMD-Llama-135m" 
+
+
+class NestedTensorDataset(Dataset):
+    def __init__(self, num_samples=10, mode=""):
+        possible_modes = ["nlp", "cv"]
+    
+        assert mode.lower() in possible_modes, f"please provide one of [{', '.join(possible_modes)}]"  
+        
+        self.datapoints, self.class_val = [], []
+
+        if mode.lower() == "nlp":
+            """ generate random garbage-ish sentences """
+            for _ in range(num_samples):
+                num_words = randrange(4, 22)
+                temp = []
+                for _ in range(num_words):
+                    word_length = randrange(1, 10)
+                    sentence = ''.join(choices(ascii_lowercase, k=word_length))
+                    temp.append(sentence)
+                
+                self.datapoints.append(" ".join(temp))
+
+                random_class = randrange(0, 10)
+                self.class_val.append(random_class)
+        else:
+            raise NotImplementedError("Please implement the CV part as well")
+
+
+    def __len__(self):
+        return len(self.datapoints)
+
+    def __getitem__(self, idx):
+        assert type(idx) == int, "Integer not provided to retrieve data"
+        return {"features": self.datapoints[idx], "labels": self.class_val[idx]}
+
+
+class NestedTensorCollator():
+    def __init__(self, tokenizer):
+        self.tokenizer = tokenizer
+
+    def __call__(self, examples):
+        features = list(map(lambda x : x["features"], examples))
+        features = self.tokenizer(features)
+        
+        input_ids = torch.nested.nested_tensor(features["input_ids"])
+        attention_mask = torch.nested.nested_tensor(features["attention_mask"])
+
+        labels = list(map(lambda x : x["labels"], examples))
+        
+        return {"input_ids": input_ids, "attention_mask": attention_mask, "labels": labels}
+ 
+
+if __name__ == "__main__":
+    profile_time("start")    
+    model = LlamaForCausalLM.from_pretrained(
+        HUGGINGFACE_MODEL,
+    )
+    profile_time("model initialized")
+
+    tokenizer = AutoTokenizer.from_pretrained(
+        HUGGINGFACE_MODEL,
+        legacy=False
+    )
+    profile_time("tokenizer initialized")
+
+    dataset = NestedTensorDataset(mode="nlp")
+    profile_time("dataset created")
+
+    collator = NestedTensorCollator(
+        tokenizer=tokenizer
+    )
+    profile_time("collator loaded")
+
+    dataloader = DataLoader(
+        dataset, 
+        batch_size=4, 
+        shuffle=True, 
+        num_workers=0,
+        collate_fn=collator
+    )
+    profile_time("dataset loaded onto generator")
+
+    for i, data in enumerate(dataloader):
+        print("LOOP", i)
+        # print(data)
+        input_ids, attention_mask, labels = data["input_ids"], data["attention_mask"], data["labels"] 
+        # output = model(
+        #     input_ids=input_ids
+        # )
+        # print(output)
+        # print("")
+        print(input_ids.size(-1))
+        # for input_id in input_ids:
+            # print("id>>", input_id) 
+        
+        print("")
+
+    profile_time("stop")
