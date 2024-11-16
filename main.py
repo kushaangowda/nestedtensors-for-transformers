@@ -1,13 +1,11 @@
+from utils import TimeProfiler
+
 from random import randrange, choices
 from string import ascii_lowercase
 import torch
-import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
-from transformers import LlamaForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import LlamaForCausalLM, AutoTokenizer
 torch.manual_seed(42)
-import time
-from constants import VERBOSE_CODE
-from utils import profile_time 
 
 """
 TASKS
@@ -22,7 +20,7 @@ complete loading of model
 
 
 HUGGINGFACE_MODEL = "amd/AMD-Llama-135m" 
-
+profiler = TimeProfiler()
 
 class NestedTensorDataset(Dataset):
     def __init__(self, num_samples=10, mode=""):
@@ -53,8 +51,9 @@ class NestedTensorDataset(Dataset):
     def __len__(self):
         return len(self.datapoints)
 
+
     def __getitem__(self, idx):
-        assert type(idx) == int, "Integer not provided to retrieve data"
+        assert type(idx) is int, "Integer not provided to retrieve data"
         return {"features": self.datapoints[idx], "labels": self.class_val[idx]}
 
 
@@ -75,25 +74,25 @@ class NestedTensorCollator():
  
 
 if __name__ == "__main__":
-    profile_time("start")    
+    profiler.profile_time("start")    
     model = LlamaForCausalLM.from_pretrained(
         HUGGINGFACE_MODEL,
     )
-    profile_time("model initialized")
+    profiler.profile_time("model initialized")
 
     tokenizer = AutoTokenizer.from_pretrained(
         HUGGINGFACE_MODEL,
         legacy=False
     )
-    profile_time("tokenizer initialized")
+    profiler.profile_time("tokenizer initialized")
 
     dataset = NestedTensorDataset(mode="nlp")
-    profile_time("dataset created")
+    profiler.profile_time("dataset created")
 
     collator = NestedTensorCollator(
         tokenizer=tokenizer
     )
-    profile_time("collator loaded")
+    profiler.profile_time("collator loaded")
 
     dataloader = DataLoader(
         dataset, 
@@ -102,7 +101,7 @@ if __name__ == "__main__":
         num_workers=0,
         collate_fn=collator
     )
-    profile_time("dataset loaded onto generator")
+    profiler.profile_time("dataset loaded onto generator")
 
     for i, data in enumerate(dataloader):
         print("LOOP", i)
@@ -119,4 +118,4 @@ if __name__ == "__main__":
         
         print("")
 
-    profile_time("stop")
+    profiler.profile_time("stop")
