@@ -1,11 +1,12 @@
 from utils import TimeProfiler
-
-from random import randrange, choices
+import random
 from string import ascii_lowercase
 import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import LlamaForCausalLM, AutoTokenizer
+
 torch.manual_seed(42)
+
 
 """
 TASKS
@@ -33,16 +34,16 @@ class NestedTensorDataset(Dataset):
         if mode.lower() == "nlp":
             """ generate random garbage-ish sentences """
             for _ in range(num_samples):
-                num_words = randrange(4, 22)
+                num_words = random.randrange(4, 22)
                 temp = []
                 for _ in range(num_words):
-                    word_length = randrange(1, 10)
-                    sentence = ''.join(choices(ascii_lowercase, k=word_length))
+                    word_length = random.randrange(1, 10)
+                    sentence = ''.join(random.choices(ascii_lowercase, k=word_length))
                     temp.append(sentence)
                 
                 self.datapoints.append(" ".join(temp))
 
-                random_class = randrange(0, 10)
+                random_class = random.randrange(0, 10)
                 self.class_val.append(random_class)
         else:
             raise NotImplementedError("Please implement the CV part as well")
@@ -61,15 +62,18 @@ class NestedTensorCollator():
     def __init__(self, tokenizer):
         self.tokenizer = tokenizer
 
+
     def __call__(self, examples):
+        """ tokenize string data and then nest it """
         features = list(map(lambda x : x["features"], examples))
-        features = self.tokenizer(features)
+        labels = list(map(lambda x : x["labels"], examples))
         
+        features = self.tokenizer(
+            features,
+        )
         input_ids = torch.nested.nested_tensor(features["input_ids"])
         attention_mask = torch.nested.nested_tensor(features["attention_mask"])
 
-        labels = list(map(lambda x : x["labels"], examples))
-        
         return {"input_ids": input_ids, "attention_mask": attention_mask, "labels": labels}
  
 
@@ -86,7 +90,10 @@ if __name__ == "__main__":
     )
     profiler.profile_time("tokenizer initialized")
 
-    dataset = NestedTensorDataset(mode="nlp")
+    dataset = NestedTensorDataset(
+        num_samples=10,
+        mode="nlp"
+    )
     profiler.profile_time("dataset created")
 
     collator = NestedTensorCollator(
@@ -108,11 +115,11 @@ if __name__ == "__main__":
         # print(data)
         input_ids, attention_mask, labels = data["input_ids"], data["attention_mask"], data["labels"] 
         # output = model(
-        #     input_ids=input_ids
+        #     input_ids=input_ids,
+        #     attention_mask=attention_mask
         # )
         # print(output)
         # print("")
-        print(input_ids.size(-1))
         # for input_id in input_ids:
             # print("id>>", input_id) 
         
