@@ -103,7 +103,7 @@ class TransformerEncoderWithPadding(nn.Module):
         )
         self.norm2 = nn.LayerNorm(embed_dim)
 
-    def forward(self, x, attention_mask):
+    def forward(self, x):
         x = x.transpose(0, 1)
         attn_output = self.attention(x, x, x)
         x = self.norm1(x + attn_output)
