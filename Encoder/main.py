@@ -7,8 +7,7 @@ import argparse
 
 from encoderDef import TransformerEncoderWithNested, TransformerEncoderWithPadding
 
-def nested_tensor_benchmark(base_batches, num_batches, embed_dim, device):
-    nested_batches = [nested_tensor(batch, layout=torch.jagged) for batch in base_batches]
+def nested_tensor_benchmark(nested_batches, num_batches, embed_dim, device):
 
     model_nested = TransformerEncoderWithNested(embed_dim=embed_dim, num_heads=8, ff_dim=256).to(device)
 
@@ -37,43 +36,27 @@ def nested_tensor_benchmark(base_batches, num_batches, embed_dim, device):
     np.save("nested_"+device+"_time.npy", np.array(forward_times_nested))
     
 
-def padded_tensor_benchmark(base_batches, num_batches, embed_dim, device, max_seq_len):
-    padded_batches = []
-    attention_masks = []
-
-    for batch in base_batches:
-        batch_padded = []
-        mask = []
-        for sequence in batch:
-            seq_len = sequence.size(0)
-            padded_sequence = torch.cat([sequence, torch.zeros(max_seq_len - seq_len, embed_dim)], dim=0)
-            batch_padded.append(padded_sequence)
-            mask.append([0] * seq_len + [1] * (max_seq_len - seq_len))
-        padded_batches.append(torch.stack(batch_padded))
-        attention_masks.append(torch.tensor(mask, dtype=torch.bool))
-        
+def padded_tensor_benchmark(padded_batches, num_batches, embed_dim, device):
         
     model_padded = TransformerEncoderWithPadding(embed_dim=embed_dim, num_heads=8, ff_dim=256).to(device)
 
     # Warmup
     forward_times_padded = []
-    for padded_batch, mask in tqdm(zip(padded_batches, attention_masks), total=num_batches):
+    for padded_batch in tqdm(padded_batches, total=num_batches):
         padded_batch = padded_batch.to(device)
-        mask = mask.to(device)
         torch.cuda.synchronize()
         start_time = time.time()
-        output = model_padded(padded_batch, mask)
+        output = model_padded(padded_batch)
         torch.cuda.synchronize()
         forward_times_padded.append(time.time() - start_time)
 
     # Actual run
     forward_times_padded = []
-    for padded_batch, mask in tqdm(zip(padded_batches, attention_masks), total=num_batches):
+    for padded_batch in tqdm(padded_batches, total=num_batches):
         padded_batch = padded_batch.to(device)
-        mask = mask.to(device)
         torch.cuda.synchronize()
         start_time = time.time()
-        output = model_padded(padded_batch, mask)
+        output = model_padded(padded_batch)
         torch.cuda.synchronize()
         forward_times_padded.append(time.time() - start_time)
 
@@ -95,10 +78,14 @@ def main(
         for batch_seq_lengths in seq_lengths
     ]
     
+    layout = torch.jagged if use_nested_tensor else None
+    nested_batches = [nested_tensor(batch, layout=layout) for batch in base_batches]
+    
     if use_nested_tensor:
-        nested_tensor_benchmark(base_batches, num_batches, embed_dim, device)
+        nested_tensor_benchmark(nested_batches, num_batches, embed_dim, device)
     else:
-        padded_tensor_benchmark(base_batches, num_batches, embed_dim, device, max_seq_len)
+        padded_batches = [torch.nested.to_padded_tensor(nt, 0.0) for nt in nested_batches]
+        padded_tensor_benchmark(padded_batches, num_batches, embed_dim, device)
     
 
 
