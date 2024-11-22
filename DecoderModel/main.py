@@ -5,13 +5,15 @@ from tqdm import tqdm
 import numpy as np
 import argparse
 
-from encoderDef import TransformerEncoderWithNested, TransformerEncoderWithPadding
+from decoderDef import DecoderOnlyModel
 
 
-def benchmark(batches, num_batches, embed_dim, device, use_nested_tensor):
+def benchmark(batches, num_batches, embed_dim, max_seq_len, 
+              vocab_size, num_blocks, device, use_nested_tensor):
         
-    model_padded = (TransformerEncoderWithNested if use_nested_tensor else TransformerEncoderWithPadding)(
-                embed_dim=embed_dim, num_heads=8, ff_dim=256
+    model_padded = DecoderOnlyModel(
+                vocab_size=vocab_size, embed_dim=embed_dim, num_blocks=num_blocks, num_heads=8,
+                ff_dim=256, max_seq_len=max_seq_len, use_nested=use_nested_tensor, dropout_p=0.0
             ).to(device)
     
     print("\nWarmup")
@@ -47,7 +49,7 @@ def benchmark(batches, num_batches, embed_dim, device, use_nested_tensor):
 
 
 def main(
-        batch_size, num_batches, max_seq_len, embed_dim, device, use_nested_tensor
+        batch_size, num_batches, max_seq_len, embed_dim, vocab_size, num_blocks, device, use_nested_tensor
     ):
 
     torch.manual_seed(12)
@@ -62,10 +64,12 @@ def main(
     nested_batches = [nested_tensor(batch, layout=layout) for batch in base_batches]
     
     if use_nested_tensor:
-        benchmark(nested_batches, num_batches, embed_dim, device, use_nested_tensor)
+        benchmark(nested_batches, num_batches, embed_dim, max_seq_len, 
+        vocab_size, num_blocks, device, use_nested_tensor)
     else:
         padded_batches = [torch.nested.to_padded_tensor(nt, 0.0) for nt in nested_batches]
-        benchmark(padded_batches, num_batches, embed_dim, device, use_nested_tensor)
+        benchmark(padded_batches, num_batches, embed_dim, max_seq_len, 
+        vocab_size, num_blocks, device, use_nested_tensor)
     
 
 
@@ -77,6 +81,8 @@ if __name__ == "__main__":
     parser.add_argument("--num_batches", type=int, default=10, help="Number of batches.")
     parser.add_argument("--max_seq_len", type=int, default=1024, help="Max sequence length.")
     parser.add_argument("--embed_dim", type=int, default=768, help="Embedding dimension.")
+    parser.add_argument("--vocab_size", type=int, default=1000, help="Vocab size.")
+    parser.add_argument("--num_blocks", type=int, default=12, help="Number of decoder blocks.")
     parser.add_argument("--device", type=str, default="cuda", choices=["cuda"], help="Device to use for training.")
     parser.add_argument("--use_nested_tensor", action="store_true", help="Use NestedTensor for forward pass optimization.")
     
@@ -89,6 +95,8 @@ if __name__ == "__main__":
         args.num_batches,
         args.max_seq_len,
         args.embed_dim,
+        args.vocab_size, 
+        args.num_blocks, 
         args.device,
         args.use_nested_tensor
     )
