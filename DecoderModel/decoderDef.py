@@ -85,7 +85,7 @@ class TransformerDecoderWithNested(nn.Module):
         self.norm2 = nn.LayerNorm(embed_dim)
 
     def forward(self, nested_input):
-        attn_output = self.attention(nested_input, nested_input, nested_input)
+        attn_output = self.attention(nested_input, nested_input, nested_input)    
         nested_input = self.norm1(nested_input + attn_output)
         ff_output = self.ff(nested_input)
         nested_input = self.norm2(nested_input + ff_output)
@@ -104,7 +104,7 @@ class TransformerDecoderWithPadding(nn.Module):
         self.norm2 = nn.LayerNorm(embed_dim)
 
     def forward(self, x):
-        attn_output = self.attention(x, x, x)
+        attn_output = self.attention(x, x, x)        
         x = self.norm1(x + attn_output)
         ff_output = self.ff(x)
         x = self.norm2(x + ff_output)
@@ -125,15 +125,18 @@ class DecoderOnlyModel(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.output_projection = nn.Linear(embed_dim, vocab_size)
 
-    def forward(self, x):
-        # N, L_t = input_ids.size()
+    def forward(self, input_ids, position_ids):
 
-        # # Token and position embeddings
-        # token_embeds = self.token_embedding(input_ids)
-        # position_ids = torch.arange(L_t, device=input_ids.device).unsqueeze(0).expand(N, -1)
-        # position_embeds = self.position_embedding(position_ids)
+        # Token and position embeddings
+        token_embeds = self.token_embedding(input_ids)
+        position_embeds = self.position_embedding(position_ids)
 
+        # TODO: Add operation not working
         # x = token_embeds + position_embeds
+        x = torch.nested.nested_tensor(
+            [token_embeds[i]+position_embeds[i] for i in range(len(position_embeds))],
+            layout=torch.jagged
+        )
 
         for block in self.blocks:
             x = block(x)
