@@ -8,7 +8,7 @@ import argparse
 from decoderDef import DecoderOnlyModel
 
 
-def benchmark(batches, num_batches, embed_dim, max_seq_len, 
+def benchmark(batches, position_batches, num_batches, embed_dim, max_seq_len, 
               vocab_size, num_blocks, device, use_nested_tensor):
         
     model_padded = DecoderOnlyModel(
@@ -20,11 +20,12 @@ def benchmark(batches, num_batches, embed_dim, max_seq_len,
 
     # Warmup
     forward_times = []
-    for batch in tqdm(batches, total=num_batches):
+    for batch, position_batch in tqdm(zip(batches, position_batches), total=num_batches):
         batch = batch.to(device)
+        position_batch = position_batch.to(device)
         torch.cuda.synchronize()
         start_time = time.time()
-        output = model_padded(batch)
+        output = model_padded(batch, position_batch)
         torch.cuda.synchronize()
         forward_times.append(time.time() - start_time)
     
@@ -32,11 +33,12 @@ def benchmark(batches, num_batches, embed_dim, max_seq_len,
 
     # Actual run
     forward_times = []
-    for batch in tqdm(batches, total=num_batches):
+    for batch, position_batch in tqdm(zip(batches, position_batches), total=num_batches):
         batch = batch.to(device)
+        position_batch = position_batch.to(device)
         torch.cuda.synchronize()
         start_time = time.time()
-        output = model_padded(batch)
+        output = model_padded(batch, position_batch)
         torch.cuda.synchronize()
         forward_times.append(time.time() - start_time)
         
@@ -46,30 +48,62 @@ def benchmark(batches, num_batches, embed_dim, max_seq_len,
 
     np.save(f"{mode}_{device}_time.npy", np.array(forward_times))
     
+    
 
-
-def main(
-        batch_size, num_batches, max_seq_len, embed_dim, vocab_size, num_blocks, device, use_nested_tensor
-    ):
-
-    torch.manual_seed(12)
-
+def getRandomTokens(batch_size, num_batches, max_seq_len, vocab_size):
+    
+    # generate random token sequences
     seq_lengths = torch.randint(10, max_seq_len + 1, (num_batches, batch_size))
-    base_batches = [
-        [torch.randn(seq_len, embed_dim) for seq_len in batch_seq_lengths]
+    
+    base_tokens = [
+        [
+            torch.randint(1, vocab_size, (seq_len,)) # 0: padding token, excluded
+            for seq_len in batch_seq_lengths
+        ]
         for batch_seq_lengths in seq_lengths
     ]
     
+    position_ids = [
+        [
+            torch.arange(seq_len)
+            for seq_len in batch_seq_lengths
+        ]
+        for batch_seq_lengths in seq_lengths
+    ]
+
+    
+    return base_tokens, position_ids
+    
+    
+
+
+def main(
+        batch_size, num_batches, max_seq_len, embed_dim, vocab_size, num_blocks,
+        device, use_nested_tensor
+    ):
+
+    torch.manual_seed(12)
+    
+    base_tokens, position_ids = getRandomTokens(
+                                    batch_size, num_batches, max_seq_len, vocab_size
+                                )
+    
     layout = torch.jagged if use_nested_tensor else None
-    nested_batches = [nested_tensor(batch, layout=layout) for batch in base_batches]
+    nested_batches = [nested_tensor(batch, layout=layout) for batch in base_tokens]
+    nested_position_ids = [nested_tensor(batch, layout=layout) for batch in position_ids]
     
     if use_nested_tensor:
-        benchmark(nested_batches, num_batches, embed_dim, max_seq_len, 
-        vocab_size, num_blocks, device, use_nested_tensor)
+        benchmark(nested_batches, nested_position_ids, num_batches, embed_dim, 
+                  max_seq_len, vocab_size, num_blocks, device, use_nested_tensor)
     else:
         padded_batches = [torch.nested.to_padded_tensor(nt, 0.0) for nt in nested_batches]
-        benchmark(padded_batches, num_batches, embed_dim, max_seq_len, 
-        vocab_size, num_blocks, device, use_nested_tensor)
+        padded_position_ids = [
+            torch.arange(pb.shape[1]).unsqueeze(0).expand(pb.shape[0], -1)
+            for pb in padded_batches
+        ]
+        
+        benchmark(padded_batches, padded_position_ids, num_batches, embed_dim, 
+                  max_seq_len, vocab_size, num_blocks, device, use_nested_tensor)
     
 
 
