@@ -76,6 +76,21 @@ def getRandomTokens(batch_size, num_batches, max_seq_len, vocab_size):
     
     
 
+def clone_and_copy(src_batches, dest_batches):
+    
+    num_batches = len(src_batches)
+    
+    for batch_idx in range(num_batches):
+        
+        src_clone = src_batches[batch_idx].clone()
+        num_samples = len(dest_batches[batch_idx])
+        
+        for idx in range(num_samples):
+            src_clone[idx].copy_(dest_batches[batch_idx][idx])
+            
+        dest_batches[batch_idx] = src_clone
+
+
 
 def main(
         batch_size, num_batches, max_seq_len, embed_dim, vocab_size, num_blocks,
@@ -93,6 +108,7 @@ def main(
     nested_position_ids = [nested_tensor(batch, layout=layout) for batch in position_ids]
     
     if use_nested_tensor:
+        clone_and_copy(nested_batches, nested_position_ids)
         benchmark(nested_batches, nested_position_ids, num_batches, embed_dim, 
                   max_seq_len, vocab_size, num_blocks, device, use_nested_tensor)
     else:
