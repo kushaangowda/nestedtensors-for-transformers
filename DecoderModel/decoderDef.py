@@ -131,12 +131,7 @@ class DecoderOnlyModel(nn.Module):
         token_embeds = self.token_embedding(input_ids)
         position_embeds = self.position_embedding(position_ids)
 
-        # TODO: Add operation not working
-        # x = token_embeds + position_embeds
-        x = torch.nested.nested_tensor(
-            [token_embeds[i]+position_embeds[i] for i in range(len(position_embeds))],
-            layout=torch.jagged
-        )
+        x = token_embeds + position_embeds
 
         for block in self.blocks:
             x = block(x)
