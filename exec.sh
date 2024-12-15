@@ -1,52 +1,34 @@
-# exercise 1 to check difference between our code and original code (both for non-nested tensors)
-
-# start=$(date +%s)
-
-# rm /home/harshbenahalkar/nestedtensors-for-transformers/data/nested_tensor.pt
-
-# rm /home/harshbenahalkar/nestedtensors-for-transformers/data/vanilla_tensor.pt
-
-
-# export LOGFILE=/home/harshbenahalkar/nestedtensors-for-transformers/data/vanilla_tensor.pt
-
-# /home/harshbenahalkar/hpml_venv_vanilla/bin/python /home/harshbenahalkar/nestedtensors-for-transformers/main.py
-
-
-# export LOGFILE=/home/harshbenahalkar/nestedtensors-for-transformers/data/nested_tensor.pt
-
-# /home/harshbenahalkar/hpml_venv/bin/python /home/harshbenahalkar/nestedtensors-for-transformers/main.py
-
-
-# /home/harshbenahalkar/hpml_venv/bin/python /home/harshbenahalkar/nestedtensors-for-transformers/eval.py \
-#     /home/harshbenahalkar/nestedtensors-for-transformers/data/nested_tensor.pt \
-#     /home/harshbenahalkar/nestedtensors-for-transformers/data/vanilla_tensor.pt
-
-
-# end=$(date +%s)
-# echo "Elapsed Time: $((end-start)) seconds"
-
-# ===  ===  ===  ===  ===  ===  ===  ===  ===  ===  ===  ===  ===  ===  ===  ===  
+# Check difference between our code and original code (for nested tensor vs without)
 
 start=$(date +%s)
 
+BASEDIR=$(pwd)
+PYTHON_PATH=$BASEDIR/.venv_nested/bin/python
+MAINFILE=$BASEDIR/main.py
+EVALFILE=$BASEDIR/eval.py
 
-ROOTPATH="/home/harshbenahalkar/nestedtensors-for-transformers"
-PYTHON_PATH="/home/harshbenahalkar/hpml_venv/bin/python"
-MAINFILE=$ROOTPATH/main.py
-EVALFILE=$ROOTPATH/eval.py
-DATAPATH=$ROOTPATH/data
+DATA_PATH = $BASEDIR"/comp-data"
+VANILLA_PATH = $DATA_PATH"/unnested_tensor.pt"
+NESTED_PATH = $DATA_PATH"/nested_tensor.pt"
 
-rm $DATAPATH/*
+# Remove old data
 
-export LOGFILE=$DATAPATH"/unnested_tensor.pt"
+rm $VANILLA_PATH
+rm $NESTED_PATH
 
+# Test without nested tensors
+
+export LOGFILE=$VANILLA_PATH
 $PYTHON_PATH $MAINFILE 
 
-export LOGFILE=$DATAPATH"/nested_tensor.pt"
+# Test with nested tensors
 
+export LOGFILE=$NESTED_PATH
 $PYTHON_PATH $MAINFILE --nest_tensor
 
-$PYTHON_PATH $EVALFILE $DATAPATH"/nested_tensor.pt" $DATAPATH"/unnested_tensor.pt"
+# Run evaluation
+
+$PYTHON_PATH $EVALFILE $VANILLA_PATH $NESTED_PATH
 
 end=$(date +%s)
 echo "Elapsed Time: $((end-start)) seconds"
