@@ -1,7 +1,12 @@
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 from hpml_utils.utils.utils import TimeProfiler, status_notifier
-from hpml_utils.utils.torch_utils import get_percentage_zero, get_all_lengths
+from hpml_utils.utils.torch_utils import get_percentage_zero, get_all_lengths, save_tensors
 
 import os
+import argparse
 import random
 from string import ascii_lowercase
 import torch
@@ -9,6 +14,8 @@ from torch.utils.data import Dataset, DataLoader
 from transformers import LlamaForCausalLM, AutoTokenizer
 from fms.models import get_model
 from fms.models.hf import to_hf_api
+
+
 
 # libraries imported
 
@@ -19,14 +26,7 @@ IBM_MODEL_PATH = "/home/harshbenahalkar/llama-160m-accelerator"
 
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 DATA_FOLDER = "data"
-UNESTED_FILE = "un_nested_{data}.pt"
-NESTED_FILE = "nested_{data}.pt"
-
 DATA_PATH = os.path.join(ROOT_PATH, DATA_FOLDER)
-FILES = {
-    0: UNESTED_FILE,
-    1: NESTED_FILE
-}
 
 # global variables set
 
@@ -146,7 +146,7 @@ def init():
 def main(filename, nest_flag):
     print("CODE STARTED")
 
-    set_seed(42)
+    set_seed(555)
     
     all_input_ids = {}
     all_attention_mask = {}
@@ -189,7 +189,7 @@ def main(filename, nest_flag):
 
 
     dataset = NestedTensorDataset(
-        num_samples=10,
+        num_samples=200,
         mode="nlp"
     )
     profiler.profile_time("dataset created")
@@ -206,7 +206,7 @@ def main(filename, nest_flag):
 
     dataloader = DataLoader(
         dataset, 
-        batch_size=32, 
+        batch_size=4, 
         shuffle=True, 
         num_workers=0,
         collate_fn=collator
@@ -214,7 +214,7 @@ def main(filename, nest_flag):
     profiler.profile_time("dataset loaded onto generator")
 
     for i, data in enumerate(dataloader):
-        print("LOOP", i)
+        print(f"batch {i} STEPS > ", end="")
         input_ids, attention_mask, labels = data["input_ids"], data["attention_mask"], data["labels"] 
         output = model(
             input_ids=input_ids,
@@ -224,16 +224,33 @@ def main(filename, nest_flag):
         all_attention_mask[i] = attention_mask
         all_outputs[i] = output.logits
 
+        save_tensors(output.logits, "o")
         break
 
-        
     torch.save(all_input_ids, get_filepath(filename.format(data="inputid")))
     torch.save(all_attention_mask, get_filepath(filename.format(data="attnmask")))
     torch.save(all_outputs, get_filepath(filename.format(data="outputs")))
     profiler.profile_time("stop")
-
+    print("CODE ENDED")
 
 if __name__ == "__main__":
-    init()
-    main(FILES[0], nest_flag=True)
-    # main(nest_flag=False)
+    # init()
+    parser = argparse.ArgumentParser(description="HPML project group 1")
+
+    parser.add_argument(
+        "--nest_tensors", 
+        action="store_true",  # This means the flag will be True if provided, False otherwise.
+        help="Enable/Disable nested tensor"
+    )
+    parser.add_argument(
+        "--filepath", 
+        type=str, 
+        help="Your name",
+        default="vanilla_{data}.pt"
+    )
+
+    args = parser.parse_args()
+
+    nest_tensors = args.nest_tensors
+    filepath = args.filepath
+    main(filepath, nest_flag=nest_tensors)
