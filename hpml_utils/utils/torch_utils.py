@@ -1,3 +1,7 @@
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 import os
 import torch
 import uuid
@@ -35,14 +39,24 @@ def get_percentage_zero(tensors):
     print(">>", sum(zero_count), "zero elements out of", sum(total_elements))
 
 
-def save_tensor(tensor):
-    filepath = "/home/harshbenahalkar/nestedtensors-for-transformers/data/tensor.pt"
-    if os.path.exist(filepath):
+def save_tensors(tensor, key=None):
+
+    filepath = os.environ.get("LOGFILE", None)
+
+    if filepath is None:
+        raise ValueError("Unable to get filepath, check again")
+        
+    if os.path.exists(filepath):
         data = torch.load(filepath)
     
     else:
         data = {}
 
-    data[str(uuid.uuid4())] = tensor
+    unique_id = str(uuid.uuid4())[:8] 
+
+    key = key + "-" if key is not None else ""
+    key = key + unique_id
+        
+    data[key] = tensor
     torch.save(data, filepath)
 

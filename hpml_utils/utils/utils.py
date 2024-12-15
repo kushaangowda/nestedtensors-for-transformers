@@ -27,12 +27,12 @@ class TimeProfiler():
             total_time = sum(self._profile_times)
 
             if VERBOSE_CODE:
-                print("\n" + "="*150, "\nPROFILING TIMES")
+                print("\n" + "="*75, "\nPROFILING TIMES")
                 
                 for _time, _msg in zip(self._profile_times, self._profile_messages): 
                     print(f"{_msg.ljust(max_length)}:", f"{_time:08.5f}", "s", f"({((_time*100)/total_time):05.2f} %)")
                 
-                print("="*150)
+                print("="*75)
             self._profile_times, self._profile_messages = [], []
 
         else:
