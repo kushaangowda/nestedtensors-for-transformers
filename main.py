@@ -15,14 +15,12 @@ from transformers import LlamaForCausalLM, AutoTokenizer
 from fms.models import get_model
 from fms.models.hf import to_hf_api
 
-
-
 # libraries imported
 
 HUGGINGFACE_MODEL = "amd/AMD-Llama-135m" 
 IBM_MODEL_ARCH = "llama"
 IBM_MODEL_VARI = "micro"
-IBM_MODEL_PATH = "/home/harshbenahalkar/llama-160m-accelerator"
+IBM_MODEL_PATH = "ibm-fms/llama-160m-accelerator"
 
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 DATA_FOLDER = "data"
@@ -33,7 +31,6 @@ DATA_PATH = os.path.join(ROOT_PATH, DATA_FOLDER)
 profiler = TimeProfiler(verbose=False)
 
 # objects defined
-
 
 def get_filepath(filename):
     return os.path.join(DATA_PATH, filename)
@@ -74,15 +71,12 @@ class NestedTensorDataset(Dataset):
         else:
             raise NotImplementedError("Please implement the CV part as well")
 
-
     def __len__(self):
         return len(self.datapoints)
-
 
     def __getitem__(self, idx):
         assert type(idx) is int, "Integer not provided to retrieve data"
         return {"features": self.datapoints[idx], "labels": self.class_val[idx]}
-
 
 class NestedTensorCollator():
 
@@ -129,24 +123,15 @@ class NestedTensorCollator():
 
 # functions and classes defined
 
-
 def init():
     if not os.path.exists(DATA_PATH): 
         os.makedirs(DATA_PATH)
-    else:
-        for filename in os.listdir(DATA_PATH):
-            file_path = os.path.join(DATA_PATH, filename)
-            
-            if os.path.isfile(file_path):
-                os.remove(file_path)
+    set_seed(555)
 
 # basic initialization
 
-
 def main(filename, nest_flag):
     print("CODE STARTED")
-
-    set_seed(555)
     
     all_input_ids = {}
     all_attention_mask = {}
@@ -154,34 +139,22 @@ def main(filename, nest_flag):
 
     profiler.profile_time("start")   
 
-
-    # model = LlamaForCausalLM.from_pretrained(
-    #     HUGGINGFACE_MODEL,
-    # )
     model = get_model(
         architecture=IBM_MODEL_ARCH, 
         variant=IBM_MODEL_VARI,
-        # model_path=IBM_MODEL_PATH,
         source="hf",
         device_type="cuda",
         norm_eps=1e-6
     )
     profiler.profile_time("get_model() called")
 
-
     model = to_hf_api(model)
     profiler.profile_time("to_hf_api() called")
-
 
     model_vocab_size = model.config.vocab_size
     print(f"Model Vocabulary Size: {model_vocab_size}")
     profiler.profile_time("max vocab size determined")
 
-
-    # tokenizer = AutoTokenizer.from_pretrained(
-    #     HUGGINGFACE_MODEL,
-    #     legacy=False
-    # ) 
     tokenizer = AutoTokenizer.from_pretrained(
         IBM_MODEL_PATH,
     )
@@ -226,6 +199,7 @@ def main(filename, nest_flag):
 
         save_tensors(output.logits, "o")
         break
+    profiler.profile_time("dataset processed")
 
     torch.save(all_input_ids, get_filepath(filename.format(data="inputid")))
     torch.save(all_attention_mask, get_filepath(filename.format(data="attnmask")))
@@ -233,10 +207,8 @@ def main(filename, nest_flag):
     profiler.profile_time("stop")
     print("CODE ENDED")
 
-if __name__ == "__main__":
-    # init()
+def read_args():
     parser = argparse.ArgumentParser(description="HPML project group 1")
-
     parser.add_argument(
         "--nest_tensors", 
         action="store_true",  # This means the flag will be True if provided, False otherwise.
@@ -245,12 +217,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--filepath", 
         type=str, 
-        help="Your name",
-        default="vanilla_{data}.pt"
+        help="Filepath for output",
+        default="vanilla_{data}"
     )
-
     args = parser.parse_args()
+    return args
 
-    nest_tensors = args.nest_tensors
-    filepath = args.filepath
-    main(filepath, nest_flag=nest_tensors)
+if __name__ == "__main__":
+    init()
+    args = read_args()
+    main(args.filepath, nest_flag=args.nest_tensors)

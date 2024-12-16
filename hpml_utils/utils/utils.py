@@ -4,7 +4,7 @@ import inspect
 from .constants import COLORS, VERBOSE_CODE
 
 def status_notifier(message):
-    print(f"{COLORS["YELLOW"]}{message.upper()}{COLORS["RESET"]}")
+    print(f"{COLORS['YELLOW']}{message.upper()}{COLORS['RESET']}")
 
 class TimeProfiler():
 
@@ -39,7 +39,7 @@ class TimeProfiler():
             if self.verbose: 
                 status_notifier(message)
             caller = inspect.stack()[1]
-            data = f"{caller.filename.split("/")[-1]} {caller.function}, {message}"
+            data = f"{caller.filename.split('/')[-1]} {caller.function}, {message}"
             self._profile_messages.append(data)
             self._currtime = time.monotonic()
             self._profile_times.append(self._currtime - self._lasttime)
