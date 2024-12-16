@@ -45,4 +45,3 @@ class TimeProfiler():
             self._profile_times.append(self._currtime - self._lasttime)
 
             self._lasttime = self._currtime
-
