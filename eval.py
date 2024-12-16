@@ -24,11 +24,9 @@ def truncate_tensor(tensor, size):
     else:
         return torch.nested.nested_tensor([ele[:s_, :] for ele, s_ in zip(tensor, size)])
 
-def print_nested_tensor_shape(nested_tensor):
-    assert nested_tensor.is_nested
-    
+def print_nested_tensor_shape(tensor):   
     constituent_shapes = []
-    for t in nested_tensor.unbind():
+    for t in tensor.unbind():
         try:
             shape = tuple(t.size())
         except AttributeError:
@@ -63,11 +61,15 @@ def plot_tensors(t1, t2, name):
         plt.close()
 
 def truncate_to_nested(nested, real):
-    assert nested.is_nested
     assert not real.is_nested
+
+    if not nested.is_nested:
+        return real
     
     truncated = []
-    for i, target in enumerate(nested.unbind()):
+    for i, target in enumerate(nested.unbind(0)):
+        if target.size(0) == 1:
+            target = target.squeeze(0)
         target_shape = tuple(target.size(dim) for dim in range(target.dim()))
         slices = [slice(0, min(real.size(dim + 1), target_shape[dim])) for dim in range(len(target_shape))]
         truncated.append(real[i][tuple(slices)])
@@ -83,7 +85,7 @@ def truncate_and_match_to_nested(nested, real, plot=False):
 
 def compare_tensors(t1, t2):
     if t1.is_nested or t2.is_nested:
-        return all([torch.equal(t1_, t2_) for t1_, t2_ in zip(t1.unbind(0), t2.unbind(0))])
+        return all([torch.allclose(t1_, t2_) for t1_, t2_ in zip(t1.unbind(0), t2.unbind(0))])
     else:
         return torch.equal(t1, t2)
 
@@ -104,9 +106,6 @@ def check_same_tokens(key1, key2):
 MATCH_STATUS = True
 for i, (t1, t2) in enumerate(zip(file1.keys(), file2.keys()), 1):
     try:
-        # lengths = get_tensor_lengths(file1[t1])
-        # tensor1 = truncate_tensor(file2[t2], lengths)
-        # status = compare_tensors(file1[t1], tensor1)
         status = truncate_and_match_to_nested(file1[t1], file2[t2], plot=False)
 
         print(str(i).ljust(3), check_same_tokens(t1, t2), color_status(status))
@@ -117,9 +116,10 @@ for i, (t1, t2) in enumerate(zip(file1.keys(), file2.keys()), 1):
             print(file1[t1], "\n----\n", file2[t2])
 
     except Exception as err:
-        print(f"Tensor Exception occured: {err}")
+        print(f"Tensor Exception occurred: {err}")
         print(i, file1[t1], "\n-\n", file2[t2])
     finally:
         # print("="*50)
         pass
+
 
