@@ -4,8 +4,9 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 
 import sys
 import torch
-from colorama import init, Fore, Style
+from print_torch import pt
 import matplotlib.pyplot as plt
+from colorama import init, Fore, Style
 
 filename1, filename2 = sys.argv[1], sys.argv[2]
 
@@ -24,9 +25,11 @@ def truncate_tensor(tensor, size):
     else:
         return torch.nested.nested_tensor([ele[:s_, :] for ele, s_ in zip(tensor, size)])
 
-def print_nested_tensor_shape(tensor):   
+def print_nested_tensor_shape(nested_tensor):
+    assert nested_tensor.is_nested
+    
     constituent_shapes = []
-    for t in tensor.unbind():
+    for t in nested_tensor.unbind():
         try:
             shape = tuple(t.size())
         except AttributeError:
@@ -62,10 +65,12 @@ def plot_tensors(t1, t2, name):
 
 
 def truncate_to_nested(nested, real):
-    assert not real.is_nested
-    
+
     if not nested.is_nested:
-        return real
+        return nested
+
+    assert nested.is_nested, "tensor is not nested"
+    assert not real.is_nested, "tensor is nested"
     
     def truncate_tensor(tensor1, tensor2):
         min_dims = [min(tensor1.size(i), tensor2.size(i)) for i in range(tensor2.ndim)]
@@ -85,11 +90,13 @@ def truncate_and_match_to_nested(nested, real, plot=False):
         plot_tensors(nested, truncated, f"match_fail_{i}")
     return match_status
 
+
 def compare_tensors(t1, t2):
     if t1.is_nested or t2.is_nested:
         return all([torch.allclose(t1_, t2_, atol=2e-6, rtol=0) for t1_, t2_ in zip(t1.unbind(0), t2.unbind(0))])
     else:
         return torch.equal(t1, t2)
+
 
 def color_status(status):
     if status:
@@ -97,31 +104,40 @@ def color_status(status):
     else:
         return Fore.RED + str(status) + Style.RESET_ALL  
 
+
 def check_same_tokens(key1, key2):
     similarity = key1.split("-")[0] == key2.split("-")[0] 
     
     if similarity:
-        return Fore.GREEN + key1.split("-")[0].ljust(15) + " " + key2.split("-")[0].ljust(15) + Style.RESET_ALL
+        return Fore.GREEN + key1.split("-")[0].ljust(5) + " " + key2.split("-")[0].ljust(5) + Style.RESET_ALL
     else:
-        return Fore.RED + key1.split("-")[0].ljust(15) + " " + key2.split("-")[0].ljust(15) + Style.RESET_ALL
+        return Fore.RED + key1.split("-")[0].ljust(5) + " " + key2.split("-")[0].ljust(5) + Style.RESET_ALL
+
+
+def print_nested_tensors_in_one_line(tensor):
+    for ele in tensor.unbind(0):
+        pt(ele)
 
 MATCH_STATUS = True
 for i, (t1, t2) in enumerate(zip(file1.keys(), file2.keys()), 1):
     try:
+        # lengths = get_tensor_lengths(file1[t1])
+        # tensor1 = truncate_tensor(file2[t2], lengths)
+        # status = compare_tensors(file1[t1], tensor1)
         status = truncate_and_match_to_nested(file1[t1], file2[t2], plot=False)
 
-        print(str(i).ljust(3), check_same_tokens(t1, t2), color_status(status))
+        print(str(i).rjust(3), ">", check_same_tokens(t1, t2), color_status(status))
 
         # print only the first instance of unmatched tensors
-        if not status and MATCH_STATUS:
-            MATCH_STATUS = False 
-            # print(file1[t1], "\n----\n", file2[t2])
+        # if not status and MATCH_STATUS:
+            # MATCH_STATUS = False 
+            # print_nested_tensors_in_one_line(file1[t1])
+            # print("----") 
+            # print_nested_tensors_in_one_line(file2[t2])
 
     except Exception as err:
-        print(f"Tensor Exception occurred: {err}")
+        print(f"Tensor Exception occured with {t1}: ({err})")
         # print(i, file1[t1], "\n-\n", file2[t2])
     finally:
-        # print("="*50)
         pass
-
 
