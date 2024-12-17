@@ -60,19 +60,21 @@ def plot_tensors(t1, t2, name):
         plt.show()
         plt.close()
 
+
 def truncate_to_nested(nested, real):
     assert not real.is_nested
-
+    
     if not nested.is_nested:
         return real
     
+    def truncate_tensor(tensor1, tensor2):
+        min_dims = [min(tensor1.size(i), tensor2.size(i)) for i in range(tensor2.ndim)]
+        slices = tuple(slice(0, dim) for dim in min_dims)
+        return tensor1[slices]
+    
     truncated = []
     for i, target in enumerate(nested.unbind(0)):
-        if target.size(0) == 1:
-            target = target.squeeze(0)
-        target_shape = tuple(target.size(dim) for dim in range(target.dim()))
-        slices = [slice(0, min(real.size(dim + 1), target_shape[dim])) for dim in range(len(target_shape))]
-        truncated.append(real[i][tuple(slices)])
+        truncated.append(truncate_tensor(real[i], target))
 
     return torch.nested.nested_tensor(truncated)
 
@@ -85,7 +87,7 @@ def truncate_and_match_to_nested(nested, real, plot=False):
 
 def compare_tensors(t1, t2):
     if t1.is_nested or t2.is_nested:
-        return all([torch.allclose(t1_, t2_) for t1_, t2_ in zip(t1.unbind(0), t2.unbind(0))])
+        return all([torch.allclose(t1_, t2_, atol=2e-6, rtol=0) for t1_, t2_ in zip(t1.unbind(0), t2.unbind(0))])
     else:
         return torch.equal(t1, t2)
 
@@ -113,11 +115,11 @@ for i, (t1, t2) in enumerate(zip(file1.keys(), file2.keys()), 1):
         # print only the first instance of unmatched tensors
         if not status and MATCH_STATUS:
             MATCH_STATUS = False 
-            print(file1[t1], "\n----\n", file2[t2])
+            # print(file1[t1], "\n----\n", file2[t2])
 
     except Exception as err:
         print(f"Tensor Exception occurred: {err}")
-        print(i, file1[t1], "\n-\n", file2[t2])
+        # print(i, file1[t1], "\n-\n", file2[t2])
     finally:
         # print("="*50)
         pass
