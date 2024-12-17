@@ -30,8 +30,8 @@ DATA_PATH = os.path.join(ROOT_PATH, DATA_FOLDER)
 
 # global variables set
 
-profiler = TimeProfiler(verbose=False)
-
+code_profiler = TimeProfiler(verbose=False)
+inference_profiler = TimeProfiler(verbose=False)
 # objects defined
 
 
@@ -143,16 +143,16 @@ def init():
 # basic initialization
 
 
-def main(filename, nest_flag):
+def main(filename, nest_flag, seed=555):
     print("CODE STARTED")
 
-    set_seed(555)
+    set_seed(seed)
     
     all_input_ids = {}
     all_attention_mask = {}
     all_outputs = {}
 
-    profiler.profile_time("start")   
+    code_profiler.profile_time("start")   
 
 
     # model = LlamaForCausalLM.from_pretrained(
@@ -166,16 +166,16 @@ def main(filename, nest_flag):
         device_type="cuda",
         norm_eps=1e-6
     )
-    profiler.profile_time("get_model() called")
+    code_profiler.profile_time("get_model() called")
 
 
     model = to_hf_api(model)
-    profiler.profile_time("to_hf_api() called")
+    code_profiler.profile_time("to_hf_api() called")
 
 
     model_vocab_size = model.config.vocab_size
     print(f"Model Vocabulary Size: {model_vocab_size}")
-    profiler.profile_time("max vocab size determined")
+    code_profiler.profile_time("max vocab size determined")
 
 
     # tokenizer = AutoTokenizer.from_pretrained(
@@ -185,14 +185,14 @@ def main(filename, nest_flag):
     tokenizer = AutoTokenizer.from_pretrained(
         IBM_MODEL_PATH,
     )
-    profiler.profile_time("tokenizer initialized")
+    code_profiler.profile_time("tokenizer initialized")
 
 
     dataset = NestedTensorDataset(
         num_samples=200,
         mode="nlp"
     )
-    profiler.profile_time("dataset created")
+    code_profiler.profile_time("dataset created")
 
 
     collator = NestedTensorCollator(
@@ -201,7 +201,7 @@ def main(filename, nest_flag):
         max_model_size=model_vocab_size,
         is_nest_required=nest_flag,
     )
-    profiler.profile_time("collator loaded")
+    code_profiler.profile_time("collator loaded")
 
 
     dataloader = DataLoader(
@@ -211,8 +211,9 @@ def main(filename, nest_flag):
         num_workers=0,
         collate_fn=collator
     )
-    profiler.profile_time("dataset loaded onto generator")
+    code_profiler.profile_time("dataset loaded onto generator")
 
+    inference_profiler.profile_time("start")
     for i, data in enumerate(dataloader):
         print(f"batch {i} STEPS > ", end="")
         input_ids, attention_mask, labels = data["input_ids"], data["attention_mask"], data["labels"] 
@@ -225,12 +226,16 @@ def main(filename, nest_flag):
         all_outputs[i] = output.logits
 
         save_tensors(output.logits, "o")
+        print(">>", output.logits)
+        inference_profiler.profile_time(f"batch {i}")
         break
+
+    inference_profiler.profile_time("stop")
 
     torch.save(all_input_ids, get_filepath(filename.format(data="inputid")))
     torch.save(all_attention_mask, get_filepath(filename.format(data="attnmask")))
     torch.save(all_outputs, get_filepath(filename.format(data="outputs")))
-    profiler.profile_time("stop")
+    # code_profiler.profile_time("stop")
     print("CODE ENDED")
 
 if __name__ == "__main__":
@@ -253,4 +258,5 @@ if __name__ == "__main__":
 
     nest_tensors = args.nest_tensors
     filepath = args.filepath
-    main(filepath, nest_flag=nest_tensors)
+    for _ in range(5):
+        main(filepath, nest_flag=nest_tensors, seed=random.randint(1, 1000))
