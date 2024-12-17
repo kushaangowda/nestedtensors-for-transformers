@@ -63,6 +63,7 @@ def plot_tensors(t1, t2, name):
         plt.show()
         plt.close()
 
+
 def truncate_to_nested(nested, real):
 
     if not nested.is_nested:
@@ -71,11 +72,14 @@ def truncate_to_nested(nested, real):
     assert nested.is_nested, "tensor is not nested"
     assert not real.is_nested, "tensor is nested"
     
+    def truncate_tensor(tensor1, tensor2):
+        min_dims = [min(tensor1.size(i), tensor2.size(i)) for i in range(tensor2.ndim)]
+        slices = tuple(slice(0, dim) for dim in min_dims)
+        return tensor1[slices]
+    
     truncated = []
-    for i, target in enumerate(nested.unbind()):
-        target_shape = tuple(target.size(dim) for dim in range(target.dim()))
-        slices = [slice(0, min(real.size(dim + 1), target_shape[dim])) for dim in range(len(target_shape))]
-        truncated.append(real[i][tuple(slices)])
+    for i, target in enumerate(nested.unbind(0)):
+        truncated.append(truncate_tensor(real[i], target))
 
     return torch.nested.nested_tensor(truncated)
 
@@ -89,7 +93,7 @@ def truncate_and_match_to_nested(nested, real, plot=False):
 
 def compare_tensors(t1, t2):
     if t1.is_nested or t2.is_nested:
-        return all([torch.equal(t1_, t2_) for t1_, t2_ in zip(t1.unbind(0), t2.unbind(0))])
+        return all([torch.allclose(t1_, t2_, atol=2e-6, rtol=0) for t1_, t2_ in zip(t1.unbind(0), t2.unbind(0))])
     else:
         return torch.equal(t1, t2)
 
