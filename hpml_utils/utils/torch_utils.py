@@ -41,6 +41,9 @@ def get_percentage_zero(tensors):
 
 def save_tensors(tensor, key=None):
 
+    if not key.startswith('o'):
+        return
+
     filepath = os.environ.get("LOGFILE", None)
 
     if filepath is None:
