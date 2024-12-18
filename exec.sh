@@ -29,24 +29,30 @@
 
 start=$(date +%s)
 
-
-ROOTPATH="/home/harshbenahalkar/nestedtensors-for-transformers"
-PYTHON_PATH="/home/harshbenahalkar/hpml_venv/bin/python"
+ROOTPATH=/home/harshbenahalkar/nestedtensors-for-transformers
+PYTHON_PATH=/home/harshbenahalkar/hpml_venv/bin/python
 MAINFILE=$ROOTPATH/main.py
 EVALFILE=$ROOTPATH/eval.py
 DATAPATH=$ROOTPATH/data
 
 rm $DATAPATH/*
 
+NUM_SAMPLES=500
+BATCH_SIZE=32
+DEVICE=cuda
+MODE=nlp
+NUM_WORKERS=0
+
+# doing with warmup
 export LOGFILE=$DATAPATH"/unnested_tensor.pt"
 
-$PYTHON_PATH $MAINFILE 
+"$PYTHON_PATH" "$MAINFILE" \
+    --num_samples $NUM_SAMPLES \
+    --batch_size $BATCH_SIZE \
+    --device $DEVICE \
+    --mode $MODE \
+    --num_workers $NUM_WORKERS
 
-export LOGFILE=$DATAPATH"/nested_tensor.pt"
-
-$PYTHON_PATH $MAINFILE --nest_tensor
-
-$PYTHON_PATH $EVALFILE $DATAPATH"/nested_tensor.pt" $DATAPATH"/unnested_tensor.pt"
 
 end=$(date +%s)
 echo "Elapsed Time: $((end-start)) seconds"
