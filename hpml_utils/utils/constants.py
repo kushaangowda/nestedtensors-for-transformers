@@ -1,6 +1,6 @@
 # from attrdict import AttrDict
 
-VERBOSE_CODE = True
+VERBOSE_CODE = False
 
 COLORS = {
     "RED": "\033[31m",
