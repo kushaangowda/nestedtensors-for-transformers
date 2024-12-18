@@ -93,7 +93,7 @@ def truncate_and_match_to_nested(nested, real, plot=False):
 
 def compare_tensors(t1, t2):
     if t1.is_nested or t2.is_nested:
-        return all([torch.allclose(t1_, t2_, atol=2e-6, rtol=0) for t1_, t2_ in zip(t1.unbind(0), t2.unbind(0))])
+        return all([torch.allclose(t1_, t2_, atol=1e-6, rtol=0) for t1_, t2_ in zip(t1.unbind(0), t2.unbind(0))])
     else:
         return torch.equal(t1, t2)
 
