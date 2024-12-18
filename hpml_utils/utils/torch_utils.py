@@ -6,6 +6,16 @@ import os
 import torch
 import uuid
 
+
+def clone_and_copy(src_batch, dest_batch):    
+    src_clone = src_batch.clone()
+    num_samples = len(dest_batch)
+    
+    for idx in range(num_samples):
+        src_clone[idx].copy_(dest_batch[idx])
+        
+    return src_clone
+
 def get_all_lengths(tensors):
     """ gives all the dimensions in a nested tensor of dim 2"""
 
@@ -40,6 +50,8 @@ def get_percentage_zero(tensors):
 
 
 def save_tensors(tensor, key=None):
+    if not key.startswith('o'):
+        return
 
     filepath = os.environ.get("LOGFILE", None)
 
@@ -57,6 +69,10 @@ def save_tensors(tensor, key=None):
     key = key + "-" if key is not None else ""
     key = key + unique_id
         
-    data[key] = tensor
+    if tensor.is_nested:
+        data[key] = torch.nested.nested_tensor(list(tensor.unbind(0)))
+    else:
+        data[key] = tensor
+        
     torch.save(data, filepath)
 

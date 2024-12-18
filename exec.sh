@@ -4,7 +4,7 @@
 start=$(date +%s)
 
 BASEDIR=$(pwd)
-PYTHON_PATH=$BASEDIR/.venv_nested/bin/python
+PYTHON_PATH=/home/kg3081/hpml_project/venv/bin/python
 MAINFILE=$BASEDIR/main.py
 EVALFILE=$BASEDIR/eval.py
 
@@ -16,15 +16,15 @@ NESTED_PATH=$DATA_PATH"/nested_tensor.pt"
 
 rm -rf $DATA_PATH
 
-# Test without nested tensors
-
-export LOGFILE=$VANILLA_PATH
-$PYTHON_PATH $MAINFILE
-
 # Test with nested tensors
 
 export LOGFILE=$NESTED_PATH
 $PYTHON_PATH $MAINFILE --nest_tensor
+
+# Test without nested tensors
+
+export LOGFILE=$VANILLA_PATH
+$PYTHON_PATH $MAINFILE
 
 # Run evaluation
 

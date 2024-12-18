@@ -86,9 +86,10 @@ def truncate_to_nested(nested, real):
 def truncate_and_match_to_nested(nested, real, plot=False):
     truncated = truncate_to_nested(nested, real)
     match_status = compare_tensors(nested, truncated)
+    tolerance = max([torch.max(abs(t-n)) for (t,n) in zip(truncated, nested)]) 
     if not match_status and plot:
         plot_tensors(nested, truncated, f"match_fail_{i}")
-    return match_status
+    return match_status, tolerance
 
 
 def compare_tensors(t1, t2):
@@ -121,23 +122,12 @@ def print_nested_tensors_in_one_line(tensor):
 MATCH_STATUS = True
 for i, (t1, t2) in enumerate(zip(file1.keys(), file2.keys()), 1):
     try:
-        # lengths = get_tensor_lengths(file1[t1])
-        # tensor1 = truncate_tensor(file2[t2], lengths)
-        # status = compare_tensors(file1[t1], tensor1)
-        status = truncate_and_match_to_nested(file1[t1], file2[t2], plot=False)
+        status, tolerance = truncate_and_match_to_nested(file1[t1], file2[t2], plot=False)
 
-        print(str(i).rjust(3), ">", check_same_tokens(t1, t2), color_status(status))
-
-        # print only the first instance of unmatched tensors
-        # if not status and MATCH_STATUS:
-            # MATCH_STATUS = False 
-            # print_nested_tensors_in_one_line(file1[t1])
-            # print("----") 
-            # print_nested_tensors_in_one_line(file2[t2])
+        print(str(i).rjust(3), ">", check_same_tokens(t1, t2), color_status(status), tolerance)
 
     except Exception as err:
         print(f"Tensor Exception occured with {t1}: ({err})")
-        # print(i, file1[t1], "\n-\n", file2[t2])
     finally:
         pass
 
