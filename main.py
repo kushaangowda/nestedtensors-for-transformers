@@ -1,19 +1,20 @@
-import warnings
-warnings.filterwarnings("ignore", category=UserWarning)
-warnings.filterwarnings("ignore", category=FutureWarning)
-
-from hpml_utils.utils.utils import TimeProfiler, status_notifier
-from hpml_utils.utils.torch_utils import get_percentage_zero, get_all_lengths, save_tensors
+from hpml_utils.utils.utils import TimeProfiler
+from hpml_utils.utils.plots import plot_batch_times
+from hpml_utils.utils.torch_utils import save_tensors
 
 import os
-import argparse
-import random
-from string import ascii_lowercase
 import torch
-from torch.utils.data import Dataset, DataLoader
-from transformers import LlamaForCausalLM, AutoTokenizer
+import random
+import argparse
+import warnings
 from fms.models import get_model
+from string import ascii_lowercase
 from fms.models.hf import to_hf_api
+from transformers import AutoTokenizer
+from torch.utils.data import Dataset, DataLoader
+
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 
 
@@ -28,6 +29,8 @@ ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 DATA_FOLDER = "data"
 DATA_PATH = os.path.join(ROOT_PATH, DATA_FOLDER)
 
+NUM_ITERS = 3
+
 # global variables set
 
 code_profiler = TimeProfiler(verbose=False)
@@ -35,22 +38,33 @@ inference_profiler = TimeProfiler(verbose=False)
 # objects defined
 
 
-def get_filepath(filename):
+def get_filepath(
+        filename: str
+    ) -> str:
     return os.path.join(DATA_PATH, filename)
 
-def set_seed(seed: int = 42):
+
+def set_seed(
+        seed: int = 42, 
+        verbose: bool = False
+    ) -> None:
     random.seed(seed)
-    # np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     os.environ["PYTHONHASHSEED"] = str(seed)
-    # print(f"Random seed set as {seed}")
+    
+    if verbose:
+        print(f"Random seed set as {seed}")
 
 
 class NestedTensorDataset(Dataset):
-    def __init__(self, num_samples=200, mode=""):
+    def __init__(
+            self, 
+            num_samples: int = 200, 
+            mode: str = ""
+        ) -> Dataset:
         possible_modes = ["nlp", "cv"]
     
         assert mode.lower() in possible_modes, f"please provide one of [{', '.join(possible_modes)}]"  
@@ -60,7 +74,7 @@ class NestedTensorDataset(Dataset):
         if mode.lower() == "nlp":
             """ generate random garbage-ish sentences """
             for _ in range(num_samples):
-                num_words = random.randrange(4, 22)
+                num_words = random.randrange(10, 256)
                 temp = []
                 for _ in range(num_words):
                     word_length = random.randrange(1, 10)
@@ -75,11 +89,14 @@ class NestedTensorDataset(Dataset):
             raise NotImplementedError("Please implement the CV part as well")
 
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.datapoints)
 
 
-    def __getitem__(self, idx):
+    def __getitem__(
+            self, 
+            idx: int
+        ) -> dict:
         assert type(idx) is int, "Integer not provided to retrieve data"
         return {"features": self.datapoints[idx], "labels": self.class_val[idx]}
 
@@ -140,21 +157,20 @@ def init():
             if os.path.isfile(file_path):
                 os.remove(file_path)
 
-# basic initialization
 
 
-def main(filename, nest_flag, seed=555):
-    print("CODE STARTED")
 
+def main(args, warmup, nest_tensor, seed=555):
+
+    # set global seed 
     set_seed(seed)
     
-    all_input_ids = {}
-    all_attention_mask = {}
-    all_outputs = {}
 
+    # start program profiling
     code_profiler.profile_time("start")   
 
 
+    # initialize model
     # model = LlamaForCausalLM.from_pretrained(
     #     HUGGINGFACE_MODEL,
     # )
@@ -163,21 +179,18 @@ def main(filename, nest_flag, seed=555):
         variant=IBM_MODEL_VARI,
         # model_path=IBM_MODEL_PATH,
         source="hf",
-        device_type="cuda",
+        device_type=args.device,
         norm_eps=1e-6
     )
     code_profiler.profile_time("get_model() called")
 
 
+    # convert model to become huggingface compatible 
     model = to_hf_api(model)
     code_profiler.profile_time("to_hf_api() called")
 
 
-    model_vocab_size = model.config.vocab_size
-    print(f"Model Vocabulary Size: {model_vocab_size}")
-    code_profiler.profile_time("max vocab size determined")
-
-
+    # initialize tokenizer 
     # tokenizer = AutoTokenizer.from_pretrained(
     #     HUGGINGFACE_MODEL,
     #     legacy=False
@@ -188,75 +201,128 @@ def main(filename, nest_flag, seed=555):
     code_profiler.profile_time("tokenizer initialized")
 
 
+    # define dataset
     dataset = NestedTensorDataset(
-        num_samples=200,
-        mode="nlp"
+        num_samples=args.num_samples,
+        mode=args.mode
     )
     code_profiler.profile_time("dataset created")
 
 
+    # define data collator
     collator = NestedTensorCollator(
         tokenizer=tokenizer,
-        device="cuda",
-        max_model_size=model_vocab_size,
-        is_nest_required=nest_flag,
+        device=args.device,
+        max_model_size=model.config.vocab_size,
+        is_nest_required=nest_tensor,
     )
     code_profiler.profile_time("collator loaded")
 
 
+    # define dataloader for huggingface trainer
     dataloader = DataLoader(
         dataset, 
-        batch_size=4, 
+        batch_size=args.batch_size, 
         shuffle=True, 
-        num_workers=0,
+        num_workers=args.num_workers,
         collate_fn=collator
     )
     code_profiler.profile_time("dataset loaded onto generator")
 
-    inference_profiler.profile_time("start")
-    for i, data in enumerate(dataloader):
-        print(f"batch {i} STEPS > ", end="")
-        input_ids, attention_mask, labels = data["input_ids"], data["attention_mask"], data["labels"] 
-        output = model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-        )
-        all_input_ids[i] = input_ids
-        all_attention_mask[i] = attention_mask
-        all_outputs[i] = output.logits
 
-        save_tensors(output.logits, "o")
-        print(">>", output.logits)
-        inference_profiler.profile_time(f"batch {i}")
-        break
+    """ WARMUP RUN """
+    if warmup:
+        for iter in range(3):
+            for i, data in enumerate(dataloader):
+                input_ids, attention_mask, _ = data["input_ids"], data["attention_mask"], data["labels"] 
+                output = model(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                )
 
-    inference_profiler.profile_time("stop")
 
-    torch.save(all_input_ids, get_filepath(filename.format(data="inputid")))
-    torch.save(all_attention_mask, get_filepath(filename.format(data="attnmask")))
-    torch.save(all_outputs, get_filepath(filename.format(data="outputs")))
-    # code_profiler.profile_time("stop")
-    print("CODE ENDED")
+    """ NORMAL RUN """
+
+    ''' run 3 runs to take smooth average values '''
+    all_batch_times = []
+    for iter in range(NUM_ITERS):
+
+        inference_profiler.profile_time("start")
+        for i, data in enumerate(dataloader):
+
+            input_ids, attention_mask, _ = data["input_ids"], data["attention_mask"], data["labels"] 
+            output = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+            )
+
+            save_tensors(output.logits, "o")
+            inference_profiler.profile_time(f"iter {iter + 1}, batch {i}")
+
+        inference_profiler.profile_time("stop")
+
+        inference_times = inference_profiler.get_all_times()
+        all_batch_times.append(inference_times)
+
+    # stop profiling    
+    code_profiler.profile_time("stop")
+
+    return all_batch_times
+
 
 if __name__ == "__main__":
     # init()
+
+    # define and parse cmd args
     parser = argparse.ArgumentParser(description="HPML project group 1")
 
     parser.add_argument(
-        "--nest_tensors", 
-        action="store_true",  # This means the flag will be True if provided, False otherwise.
-        help="Enable/Disable nested tensor"
+        "--num_samples", 
+        type=int, 
+        help="number of samples in dataset",
+        default=500
     )
+    
     parser.add_argument(
-        "--filepath", 
+        "--batch_size", 
+        type=int, 
+        help="inference batch size",
+        default=32
+    )
+
+    parser.add_argument(
+        "--device", 
         type=str, 
-        help="Your name",
-        default="vanilla_{data}.pt"
+        help="computation device",
+        default="cuda"
+    )
+
+    parser.add_argument(
+        "--mode", 
+        type=str, 
+        help="dataset mode... can be 'nlp' or 'cv'",
+        default="nlp"
+    )
+
+    parser.add_argument(
+        "--num_workers", 
+        type=int, 
+        help="number of dataloader",
+        default=0
     )
 
     args = parser.parse_args()
 
-    nest_tensors = args.nest_tensors
-    filepath = args.filepath
-    for _ in range(5):
-        main(filepath, nest_flag=nest_tensors, seed=random.randint(1, 1000))
+    all_batch_times = []
+    for warmup in [False, True]:
+        for nest_tensor in [False, True]:
+            print(f">>>> warmup {warmup} nest_tensor {nest_tensor}")
+            batch_times = main(args, warmup, nest_tensor, seed=42)
+            all_batch_times.append(batch_times)
+
+    plot_batch_times(
+        all_batch_times[0],
+        all_batch_times[1],
+        all_batch_times[2],
+        all_batch_times[3]
+    )
