@@ -15,6 +15,11 @@ from transformers import LlamaForCausalLM, AutoTokenizer
 from fms.models import get_model
 from fms.models.hf import to_hf_api
 
+import torch.profiler
+import pandas as pd
+import matplotlib.pyplot as plt
+import pickle 
+
 # libraries imported
 
 HUGGINGFACE_MODEL = "amd/AMD-Llama-135m" 
@@ -80,11 +85,12 @@ class NestedTensorDataset(Dataset):
 
 class NestedTensorCollator():
 
-    def __init__(self, tokenizer, device, max_model_size, is_nest_required):
+    def __init__(self, tokenizer, device, max_model_size, is_nest_required, max_seq_len=100):
         self.tokenizer = tokenizer
         self.is_nest_required = is_nest_required
         self.max_model_size = max_model_size
         self.device = device
+        self.max_seq_len = max_seq_len
 
     def __call__(self, examples):
         """ tokenize string data and then nest it """
@@ -113,7 +119,7 @@ class NestedTensorCollator():
                 features,
                 return_tensors="pt",
                 padding="max_length",
-                max_length=100,
+                max_length=self.max_seq_len,
                 truncation=True,
             )
             input_ids = features["input_ids"].remainder(self.max_model_size - 1).to(self.device)
@@ -123,12 +129,106 @@ class NestedTensorCollator():
 
 # functions and classes defined
 
+# basic initialization
 def init():
     if not os.path.exists(DATA_PATH): 
         os.makedirs(DATA_PATH)
     set_seed(555)
 
-# basic initialization
+def get_cuda_allocated_memory():
+    return torch.cuda.memory_allocated() / 1000000
+
+def get_max_memory_usage(profiler):
+    sorted_results = sorted(
+        list(profiler.key_averages()), 
+        key=lambda x: x.cuda_memory_usage, 
+        reverse=True  # This sorts from highest to lowest
+    )
+    max_gpu = sorted_results[0].cuda_memory_usage / 1000000
+
+    sorted_results = sorted(
+        list(profiler.key_averages()), 
+        key=lambda x: x.cpu_memory_usage, 
+        reverse=True  # This sorts from highest to lowest
+    )
+    max_cpu = sorted_results[0].cpu_memory_usage / 1000000
+
+    # Accessing specific columns or performing operations
+    # print(data_df.head())  # View first few rows
+    # print(data_df.columns)  # See available columns
+    # print(profiler.key_averages().table(sort_by="cuda_memory_usage", row_limit=1))
+
+    return max_gpu, max_cpu
+
+def profile_memory_run(filename, batch_size=4, device="cuda", nest_flag=False):
+    torch.cuda.empty_cache()
+
+    model = get_model(
+        architecture=IBM_MODEL_ARCH, 
+        variant=IBM_MODEL_VARI,
+        source="hf",
+        device_type=device,
+        norm_eps=1e-6
+    )
+    model = to_hf_api(model)
+
+    tokenizer = AutoTokenizer.from_pretrained(
+        IBM_MODEL_PATH,
+    )
+
+    dataset = NestedTensorDataset(
+        num_samples=200,
+        mode="nlp"
+    )
+
+    all_batch_mems = []
+    
+    collator = NestedTensorCollator(
+        tokenizer=tokenizer,
+        device=device,
+        max_model_size=model.config.vocab_size,
+        is_nest_required=nest_flag,
+        max_seq_len=100,
+    )
+
+    dataloader = DataLoader(
+        dataset, 
+        batch_size=batch_size, 
+        shuffle=True, 
+        num_workers=0,
+        collate_fn=collator
+    )
+
+    with torch.profiler.profile(profile_memory=True) as prof:
+        for i, data in enumerate(dataloader):
+            input_ids, attention_mask, labels = data["input_ids"], data["attention_mask"], data["labels"] 
+            output = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+            )
+            break
+
+    return get_max_memory_usage(prof)        
+
+def profile_memory(filename, nest_flag):
+    # Batch size
+    mem_usage = {
+        "gpu": [],
+        "cpu": []
+    }
+    batch_sizes = [2, 4, 8, 16, 32]
+    for batch_size in batch_sizes:
+        g, c = profile_memory_run(filename, batch_size=batch_size, nest_flag=nest_flag)
+        mem_usage["gpu"].append(g)
+        mem_usage["cpu"].append(c)
+    mem_usage["batch_sizes"] = batch_sizes
+
+    with open(get_filepath(filename.format(data='mem_usage.pkl')), 'wb') as f:
+        pickle.dump(mem_usage, f)
+        f.close()
+
+    # Max Sequence Length
+
 
 def main(filename, nest_flag):
     print("CODE STARTED")
@@ -211,7 +311,7 @@ def read_args():
     parser = argparse.ArgumentParser(description="HPML project group 1")
     parser.add_argument(
         "--nest_tensors", 
-        action="store_true",  # This means the flag will be True if provided, False otherwise.
+        action="store_true", 
         help="Enable/Disable nested tensor"
     )
     parser.add_argument(
@@ -220,10 +320,19 @@ def read_args():
         help="Filepath for output",
         default="vanilla_{data}"
     )
+    parser.add_argument(
+        "--mem", 
+        action="store_true", 
+        help="Perform memory profiling",
+    )
     args = parser.parse_args()
     return args
 
 if __name__ == "__main__":
     init()
     args = read_args()
-    main(args.filepath, nest_flag=args.nest_tensors)
+
+    if args.mem:
+        profile_memory(args.filepath, nest_flag=args.nest_tensors)
+    else:
+        main(args.filepath, nest_flag=args.nest_tensors)
