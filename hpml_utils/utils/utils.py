@@ -16,6 +16,7 @@ class TimeProfiler():
     def profile_time(self, message):
 
         if message.lower() == "start":
+            self._profile_times, self._profile_messages = [], []
             self._lasttime, self._currtime = time.monotonic(), time.monotonic()
 
         elif message.lower() == "stop":
@@ -33,7 +34,6 @@ class TimeProfiler():
                     print(f"{_msg.ljust(max_length)}:", f"{_time:08.5f}", "s", f"({((_time*100)/total_time):05.2f} %)")
                 
                 print("="*75)
-            self._profile_times, self._profile_messages = [], []
 
         else:
             if self.verbose: 
@@ -45,3 +45,7 @@ class TimeProfiler():
             self._profile_times.append(self._currtime - self._lasttime)
 
             self._lasttime = self._currtime
+
+
+    def get_all_times(self):
+        return self._profile_times 
