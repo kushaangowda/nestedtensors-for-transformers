@@ -63,3 +63,9 @@ def save_tensors(tensor, key=None):
     data[key] = tensor
     torch.save(data, filepath)
 
+
+
+def print_state(state):
+    return 
+
+    print(state, end=" ") 
