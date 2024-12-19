@@ -1,34 +1,72 @@
-# Check difference between our code and original code (for nested tensor vs without)
-# Comparison check to see if our code matches the original code output
-
 start=$(date +%s)
 
 BASEDIR=$(pwd)
+ROOTPATH=$BASEDIR
 PYTHON_PATH=/home/kg3081/hpml_project/venv/bin/python
-MAINFILE=$BASEDIR/main.py
-EVALFILE=$BASEDIR/eval.py
+MAINFILE=$ROOTPATH/main.py
+EVALFILE=$ROOTPATH/eval.py
+TIMEPROFILEFILE=$ROOTPATH/time_profiling.py
+DATAPATH=$ROOTPATH/data
 
-DATA_PATH=$BASEDIR"/data"
-VANILLA_PATH=$DATA_PATH"/unnested_tensor.pt"
-NESTED_PATH=$DATA_PATH"/nested_tensor.pt"
+rm -rf $DATAPATH
+mkdir $DATAPATH
 
-# Remove old data
+NUM_SAMPLES=300
+BATCH_SIZE=8
+DEVICE=cuda
+MODE=nlp
+NUM_WORKERS=0
 
-rm -rf $DATA_PATH
+# without warmup
 
-# Test with nested tensors
+export LOGFILE=$DATAPATH"/no_warmup_no_nested.pt"
+"$PYTHON_PATH" "$MAINFILE" \
+    --num_samples $NUM_SAMPLES \
+    --batch_size $BATCH_SIZE \
+    --device $DEVICE \
+    --mode $MODE \
+    --num_workers $NUM_WORKERS
 
-export LOGFILE=$NESTED_PATH
-$PYTHON_PATH $MAINFILE --nest_tensor
+export LOGFILE=$DATAPATH"/no_warmup_nested.pt"
+"$PYTHON_PATH" "$MAINFILE" \
+    --num_samples $NUM_SAMPLES \
+    --batch_size $BATCH_SIZE \
+    --device $DEVICE \
+    --mode $MODE \
+    --num_workers $NUM_WORKERS \
+    --use_nested
 
-# Test without nested tensors
+# with warmup
 
-export LOGFILE=$VANILLA_PATH
-$PYTHON_PATH $MAINFILE
+export LOGFILE=$DATAPATH"/warmup_no_nested.pt"
+"$PYTHON_PATH" "$MAINFILE" \
+    --num_samples $NUM_SAMPLES \
+    --batch_size $BATCH_SIZE \
+    --device $DEVICE \
+    --mode $MODE \
+    --num_workers $NUM_WORKERS \
+    --use_warmup
 
-# Run evaluation
+export LOGFILE=$DATAPATH"/warmup_nested.pt"
+"$PYTHON_PATH" "$MAINFILE" \
+    --num_samples $NUM_SAMPLES \
+    --batch_size $BATCH_SIZE \
+    --device $DEVICE \
+    --mode $MODE \
+    --num_workers $NUM_WORKERS \
+    --use_warmup \
+    --use_nested
 
-$PYTHON_PATH $EVALFILE $NESTED_PATH $VANILLA_PATH 
+
+# Plot time graphs
+"$PYTHON_PATH" "$TIMEPROFILEFILE"
+
+
+# Compare tensors
+"$PYTHON_PATH" "$EVALFILE" \
+    $DATAPATH"/warmup_nested.pt" \
+    $DATAPATH"/warmup_no_nested.pt"
+
 
 end=$(date +%s)
 echo "Elapsed Time: $((end-start)) seconds"
