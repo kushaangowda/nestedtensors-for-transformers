@@ -8,7 +8,4 @@ setup(
     author_email='hb2776@columbia.edu',
     packages=find_packages(),
     install_requires=[],
-        # 'dependency1',
-    #     'dependency2',
-    # ],
 )

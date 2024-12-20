@@ -7,3 +7,4 @@ lab4.py
 data/
 plots/
 *.pyc
+*egg-info

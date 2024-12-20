@@ -11,22 +11,22 @@ class TimeProfiler():
     def setPrefix(self, prefix):
         self.prefix = prefix
         
-    def start(self, msg, cuda_syn=True):
+    def start(self, msg, cuda_sync=True):
         
         msg = self.prefix + ":" + msg
             
-        if cuda_syn:
+        if cuda_sync:
             torch.cuda.synchronize()
             
         start_time = time.monotonic()
             
         self.start_times[msg].append(start_time)
         
-    def stop(self, msg, cuda_syn=True):
+    def stop(self, msg, cuda_sync=True):
         
         msg = self.prefix + ":" + msg
             
-        if cuda_syn:
+        if cuda_sync:
             torch.cuda.synchronize()
             
         end_time = time.monotonic()

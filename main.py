@@ -1,4 +1,3 @@
-from hpml_utils.utils.plots import plot_batch_times
 from hpml_utils.utils.torch_utils import save_tensors
 from hpml_utils.utils.profiler import profiler
 
@@ -7,8 +6,11 @@ import torch
 import random
 import argparse
 import warnings
-from fms.models import get_model
 from string import ascii_lowercase
+import numpy as np
+import pickle
+
+from fms.models import get_model
 from fms.models.hf import to_hf_api
 from transformers import AutoTokenizer
 from torch.utils.data import Dataset, DataLoader
@@ -16,11 +18,7 @@ from torch.utils.data import Dataset, DataLoader
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-import numpy as np
-import pickle
-
-# libraries imported
-
+# global variables
 HUGGINGFACE_MODEL = "amd/AMD-Llama-135m" 
 IBM_MODEL_ARCH = "llama"
 IBM_MODEL_VARI = "micro"
@@ -31,10 +29,6 @@ DATA_FOLDER = "data"
 DATA_PATH = os.path.join(ROOT_PATH, DATA_FOLDER)
 
 NUM_ITERS = 1
-
-# global variables set
-
-# objects defined
 
 def get_filepath(
         filename: str
@@ -139,27 +133,13 @@ class NestedTensorCollator():
 
         return {"input_ids": input_ids, "attention_mask": attention_mask, "labels": labels}
 
-# functions and classes defined
-
-
-def init():
-    if not os.path.exists(DATA_PATH): 
-        os.makedirs(DATA_PATH)
-    else:
-        for filename in os.listdir(DATA_PATH):
-            file_path = os.path.join(DATA_PATH, filename)
-            
-            if os.path.isfile(file_path):
-                os.remove(file_path)
-
-
-
 
 def main(args, warmup, nest_tensor, seed=555):
 
     # set global seed 
     set_seed(seed)
     
+    # Clear time profiler
     profiler.clear()
 
     # initialize model

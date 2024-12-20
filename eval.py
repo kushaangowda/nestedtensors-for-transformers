@@ -7,57 +7,8 @@ import torch
 from print_torch import pt
 import matplotlib.pyplot as plt
 import os
-from colorama import init, Fore, Style
+from colorama import Fore, Style
 
-# def get_tensor_lengths(tensor):
-#     if tensor.is_nested:
-#         return [ele.size(0) for ele in tensor.unbind(0)]
-#     else:
-#         return [tensor.size(1) for _ in range(tensor.size(0))]
-
-# def truncate_tensor(tensor, size):
-#     if tensor.ndimension() == 2:
-#         return torch.nested.nested_tensor([ele[:s_] for ele, s_ in zip(tensor, size)])
-#     else:
-#         return torch.nested.nested_tensor([ele[:s_, :] for ele, s_ in zip(tensor, size)])
-
-# def print_nested_tensor_shape(nested_tensor):
-#     assert nested_tensor.is_nested
-    
-#     constituent_shapes = []
-#     for t in nested_tensor.unbind():
-#         try:
-#             shape = tuple(t.size())
-#         except AttributeError:
-#             shape = "variable"
-#         constituent_shapes.append(shape)
-    
-#     print("Nested tensor shapes:")
-#     for i, shape in enumerate(constituent_shapes):
-#         print(f"  Tensor {i}: {shape}")
-
-# def plot_tensors(t1, t2, name):
-#     if t1.dim() != 3 or t2.dim() != 3:
-#         return
-
-#     if t1.is_nested:
-#         t1 = t1.unbind(0)
-
-#     if t2.is_nested:
-#         t2 = t2.unbind(0)
-
-#     for i in range(len(t1)):
-#         plt.imshow(t1[i].cpu().detach().numpy(), cmap='viridis')  # You can change the colormap if you want
-#         plt.colorbar()  # Add a colorbar to interpret the values
-#         plt.savefig(f"data/{name}_t1_{i}.png")
-#         plt.show()
-#         plt.close()
-
-#         plt.imshow(t2[i].cpu().detach().numpy(), cmap='viridis')  # You can change the colormap if you want
-#         plt.colorbar()  # Add a colorbar to interpret the values
-#         plt.savefig(f"data/{name}_t2_{i}.png")
-#         plt.show()
-#         plt.close()
     
 def truncate_tensor(tensor1, tensor2):
     min_dims = [min(tensor1.size(i), tensor2.size(i)) for i in range(tensor2.ndim)]
@@ -82,8 +33,6 @@ def truncate_and_match_to_nested(nested, real):
     truncated = truncate_to_nested(nested, real)
     match_status = compare_tensors(nested, truncated)
     tolerance = max([torch.max(abs(t-n)) for (t,n) in zip(truncated, nested)]) 
-    # if not match_status and plot:
-    #     plot_tensors(nested, truncated, f"match_fail_{i}")
     return match_status, tolerance.item()
 
 
