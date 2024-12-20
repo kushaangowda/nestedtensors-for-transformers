@@ -1,18 +1,21 @@
+# To measure time taken by the entire script
 start=$(date +%s)
 
 BASEDIR=$(pwd)
-ROOTPATH=$BASEDIR
+ROOT_PATH=$BASEDIR
 PYTHON_PATH=/home/kg3081/hpml_project/venv/bin/python
-MAINFILE=$ROOTPATH/main.py
-EVALFILE=$ROOTPATH/eval.py
-TIMEPROFILEFILE=$ROOTPATH/time_profiling.py
-DATAPATH=$ROOTPATH/data
-LOGPATH=$ROOTPATH/log
+MAIN_FILE=$ROOT_PATH/main.py
+EVAL_FILE=$ROOT_PATH/eval.py
+TIME_PROFILE_FILE=$ROOT_PATH/time_profiling.py
+DATA_PATH=$ROOT_PATH/data
+LOG_PATH=$ROOT_PATH/log
 
-rm -rf $LOGPATH
+# Remove existing directories
+rm -rf $LOG_PATH
+rm -rf $DATA_PATH
 
-rm -rf $DATAPATH
-mkdir $DATAPATH
+# Create new folder to save data
+mkdir $DATA_PATH
 
 NUM_SAMPLES=300
 BATCH_SIZE=8
@@ -22,16 +25,16 @@ NUM_WORKERS=0
 
 # without warmup
 
-export LOGFILE=$DATAPATH"/no_warmup_no_nested.pt"
-"$PYTHON_PATH" "$MAINFILE" \
+export LOGFILE=$DATA_PATH"/no_warmup_no_nested.pt"
+"$PYTHON_PATH" "$MAIN_FILE" \
     --num_samples $NUM_SAMPLES \
     --batch_size $BATCH_SIZE \
     --device $DEVICE \
     --mode $MODE \
     --num_workers $NUM_WORKERS
 
-export LOGFILE=$DATAPATH"/no_warmup_nested.pt"
-"$PYTHON_PATH" "$MAINFILE" \
+export LOGFILE=$DATA_PATH"/no_warmup_nested.pt"
+"$PYTHON_PATH" "$MAIN_FILE" \
     --num_samples $NUM_SAMPLES \
     --batch_size $BATCH_SIZE \
     --device $DEVICE \
@@ -41,8 +44,8 @@ export LOGFILE=$DATAPATH"/no_warmup_nested.pt"
 
 # with warmup
 
-export LOGFILE=$DATAPATH"/warmup_no_nested.pt"
-"$PYTHON_PATH" "$MAINFILE" \
+export LOGFILE=$DATA_PATH"/warmup_no_nested.pt"
+"$PYTHON_PATH" "$MAIN_FILE" \
     --num_samples $NUM_SAMPLES \
     --batch_size $BATCH_SIZE \
     --device $DEVICE \
@@ -50,8 +53,8 @@ export LOGFILE=$DATAPATH"/warmup_no_nested.pt"
     --num_workers $NUM_WORKERS \
     --use_warmup
 
-export LOGFILE=$DATAPATH"/warmup_nested.pt"
-"$PYTHON_PATH" "$MAINFILE" \
+export LOGFILE=$DATA_PATH"/warmup_nested.pt"
+"$PYTHON_PATH" "$MAIN_FILE" \
     --num_samples $NUM_SAMPLES \
     --batch_size $BATCH_SIZE \
     --device $DEVICE \
@@ -61,14 +64,14 @@ export LOGFILE=$DATAPATH"/warmup_nested.pt"
     --use_nested
 
 
-# Plot time graphs
-"$PYTHON_PATH" "$TIMEPROFILEFILE"
+# Time plots
+"$PYTHON_PATH" "$TIME_PROFILE_FILE"
 
 
 # Compare tensors
-"$PYTHON_PATH" "$EVALFILE" \
-    $DATAPATH"/warmup_nested.pt" \
-    $DATAPATH"/warmup_no_nested.pt"
+"$PYTHON_PATH" "$EVAL_FILE" \
+    $DATA_PATH"/warmup_nested.pt" \
+    $DATA_PATH"/warmup_no_nested.pt"
 
 
 end=$(date +%s)

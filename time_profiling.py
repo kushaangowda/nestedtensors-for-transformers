@@ -4,6 +4,9 @@ import pickle
 import shutil
 
 def getTimes(fileName):
+    """
+    Read and return data related to time measurements
+    """
     
     times = {}
 
@@ -15,11 +18,9 @@ def getTimes(fileName):
     
     times = {}
     for category in categories:
-        # times[category+" (total)"] = []
         times[category] = []
         for prefix in prefixes:
             total = sum(data[prefix+":"+category])
-            # times[category+" (total)"].append(total)
             times[category].append(total/len(data[prefix+":"+category]))
         
     return times

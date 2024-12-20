@@ -7,7 +7,20 @@ import torch
 import uuid
 
 
-def clone_and_copy(src_batch, dest_batch):    
+def clone_and_copy(src_batch, dest_batch):
+    """
+    Cloning and copying function to handle shape mismatch errors 
+    when adding two nested tensors.
+
+    Parameters:
+    - src_batch (NestedTensor): The batch data to be cloned.
+    - dest_batch (NestedTensor): The batch data to copy from.
+
+    Functionality:
+    - Clones the structure from `src_batch`.
+    - Copies the content from `dest_batch` to the cloned structure.
+    """
+    
     src_clone = src_batch.clone()
     num_samples = len(dest_batch)
     

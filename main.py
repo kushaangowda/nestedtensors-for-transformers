@@ -10,6 +10,8 @@ from string import ascii_lowercase
 import numpy as np
 import pickle
 
+from contextlib import nullcontext
+
 from fms.models import get_model
 from fms.models.hf import to_hf_api
 from transformers import AutoTokenizer
@@ -231,7 +233,12 @@ def main(args, warmup, nest_tensor, seed=555):
         profile_memory=True,
     )
     
-    with torch_profiler:
+    if args.use_torch_profiler:
+        profiler_context = torch_profiler
+    else:
+        profiler_context = nullcontext()
+    
+    with profiler_context:
         
         for iter in range(NUM_ITERS):
             
@@ -250,7 +257,8 @@ def main(args, warmup, nest_tensor, seed=555):
                 
                 save_tensors(output.logits, "output")
                 
-            torch_profiler.step()
+            if args.use_torch_profiler:
+                torch_profiler.step()
     
     with open(file_name_prefix+'_times.pkl', 'wb') as file:
         pickle.dump(time_profiler.getAll(), file)
@@ -268,6 +276,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_workers", type=int, help="number of dataloader", default=0)
     parser.add_argument('--use_warmup', action='store_true', help='Use warmup')
     parser.add_argument('--use_nested', action='store_true', help='Use nested tensors')
+    parser.add_argument('--use_torch_profiler', action='store_true', help='Use torch profiler')
     
     args = parser.parse_args()
             
