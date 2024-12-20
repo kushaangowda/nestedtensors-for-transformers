@@ -1,5 +1,5 @@
 from hpml_utils.utils.torch_utils import save_tensors
-from hpml_utils.utils.profiler import profiler
+from hpml_utils.utils.profiler import profiler as time_profiler
 
 import os
 import torch
@@ -14,6 +14,7 @@ from fms.models import get_model
 from fms.models.hf import to_hf_api
 from transformers import AutoTokenizer
 from torch.utils.data import Dataset, DataLoader
+from torch.profiler import profile, ProfilerActivity, tensorboard_trace_handler, record_function
 
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -135,15 +136,19 @@ class NestedTensorCollator():
 
 
 def main(args, warmup, nest_tensor, seed=555):
+    with profile(
+        use_cuda=True
+    ) as p:
+        pass
 
     # set global seed 
     set_seed(seed)
     
     # Clear time profiler
-    profiler.clear()
+    time_profiler.clear()
 
     # initialize model
-    profiler.start("get_model()")
+    time_profiler.start("get_model()")
     model = get_model(
         architecture=IBM_MODEL_ARCH, 
         variant=IBM_MODEL_VARI,
@@ -151,43 +156,43 @@ def main(args, warmup, nest_tensor, seed=555):
         device_type=args.device,
         norm_eps=1e-6
     )
-    profiler.stop("get_model()")
+    time_profiler.stop("get_model()")
 
 
     # convert model to become huggingface compatible 
-    profiler.start("to_hf_api()")
+    time_profiler.start("to_hf_api()")
     model = to_hf_api(model)
-    profiler.stop("to_hf_api()")
+    time_profiler.stop("to_hf_api()")
  
-    profiler.start("tokenizer init")
+    time_profiler.start("tokenizer init")
     tokenizer = AutoTokenizer.from_pretrained(
         IBM_MODEL_PATH,
     )
-    profiler.stop("tokenizer init")
+    time_profiler.stop("tokenizer init")
 
 
     # define dataset
-    profiler.start("dataset creation")
+    time_profiler.start("dataset creation")
     dataset = NestedTensorDataset(
         num_samples=args.num_samples,
         mode=args.mode
     )
-    profiler.stop("dataset creation")
+    time_profiler.stop("dataset creation")
 
 
     # define data collator
-    profiler.start("collator creation")
+    time_profiler.start("collator creation")
     collator = NestedTensorCollator(
         tokenizer=tokenizer,
         device=args.device,
         max_model_size=model.config.vocab_size,
         is_nest_required=nest_tensor,
     )
-    profiler.stop("collator creation")
+    time_profiler.stop("collator creation")
 
 
     # define dataloader for huggingface trainer
-    profiler.start("dataloader creation")
+    time_profiler.start("dataloader creation")
     dataloader = DataLoader(
         dataset, 
         batch_size=args.batch_size, 
@@ -195,14 +200,14 @@ def main(args, warmup, nest_tensor, seed=555):
         num_workers=args.num_workers,
         collate_fn=collator
     )
-    profiler.stop("dataloader creation")
+    time_profiler.stop("dataloader creation")
 
     file_name_prefix = f"./data/warmup_{warmup}_nest_tensor_{nest_tensor}"
     
     with open(file_name_prefix+'_init_times.pkl', 'wb') as file:
-        pickle.dump(profiler.getAll(), file)
+        pickle.dump(time_profiler.getAll(), file)
                 
-    profiler.clear()
+    time_profiler.clear()
 
     """ WARMUP RUN """
     if warmup:
@@ -214,32 +219,41 @@ def main(args, warmup, nest_tensor, seed=555):
                     attention_mask=None,
                 )
 
-    profiler.clear()
+    time_profiler.clear()
 
     """ NORMAL RUN """
 
-    gpu_memory_usage = []
+    torch_profiler = profile(
+        activities=[ProfilerActivity.CUDA, ProfilerActivity.CPU],
+        on_trace_ready=tensorboard_trace_handler(f'./log/warmup_{warmup}_nest_tensor_{nest_tensor}/'),
+        with_stack=True,
+        record_shapes=True,
+        profile_memory=True,
+    )
     
-    for iter in range(NUM_ITERS):
+    with torch_profiler:
         
-        for i, data in enumerate(dataloader):
-            profiler.setPrefix(f"iter {iter + 1} batch {i}")
-
-            profiler.start("inference")
-            input_ids, _, _ = data["input_ids"], data["attention_mask"], data["labels"] 
-            output = model(
-                input_ids=input_ids,
-                attention_mask=None,
-            )
-            gpu_memory_usage.append(torch.cuda.memory_allocated('cuda') / 1e6)
-            profiler.stop("inference")
+        for iter in range(NUM_ITERS):
             
-            save_tensors(output.logits, "o")
-    
-    np.save(file_name_prefix+"_gpu.npy", gpu_memory_usage)
+            for i, data in enumerate(dataloader):
+                time_profiler.setPrefix(f"iter {iter + 1} batch {i}")
+                
+                time_profiler.start("inference")
+                input_ids, _, _ = data["input_ids"], data["attention_mask"], data["labels"] 
+                
+                with record_function("model_inference"):
+                    output = model(
+                        input_ids=input_ids,
+                        attention_mask=None,
+                    )
+                time_profiler.stop("inference")
+                
+                save_tensors(output.logits, "output")
+                
+            torch_profiler.step()
     
     with open(file_name_prefix+'_times.pkl', 'wb') as file:
-        pickle.dump(profiler.getAll(), file)
+        pickle.dump(time_profiler.getAll(), file)
 
 
 if __name__ == "__main__":
