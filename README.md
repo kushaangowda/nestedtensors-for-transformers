@@ -4,31 +4,30 @@ This project aims to implement a complete forward pass for the LLAMA model using
 
 FMS PR: [https://github.com/foundation-model-stack/foundation-model-stack/pull/370](https://github.com/foundation-model-stack/foundation-model-stack/pull/370)
 
-
-
 ## Setup
 
-
 1. Create a virtual environment and activate it
-    ```bash
-    python -m venv venv
-    source venv/bin/activate
-    ```
+
+   ```bash
+   python -m venv venv
+   source venv/bin/activate
+   ```
 
 1. In the root directory, clone the FMS repository, switch to the PR branch, and install the package in editable mode.
-    ```bash
-    git clone https://github.com/foundation-model-stack/foundation-model-stack.git
-    ```
 
-    ```bash
-    cd foundation-model-stack
-    git fetch origin pull/370/head:pr-370
-    git checkout pr-370
-    ```
+   ```bash
+   git clone https://github.com/foundation-model-stack/foundation-model-stack.git
+   ```
 
-    ```bash
-    pip install -e .
-    ```
+   ```bash
+   cd foundation-model-stack
+   git fetch origin pull/370/head:pr-370
+   git checkout pr-370
+   ```
+
+   ```bash
+   pip install -e .
+   ```
 
 1. Clone this repository in the root directory.
 
@@ -45,11 +44,12 @@ FMS PR: [https://github.com/foundation-model-stack/foundation-model-stack/pull/3
    ```
 
 1. To reproduce our results:
-    ```bash
-    bash exec.sh
-    ```
+   ```bash
+   bash exec.sh
+   ```
 
 ## Running Experiments with Different Configurations
+
 To run experiments with custom configurations, you can modify the parameters in the `exec.sh` script. The `main.py` file, which handles the experiment execution, accepts the following command-line arguments:
 
 - `--num_samples`: Specifies the number of data points to use.
@@ -65,65 +65,77 @@ To run experiments with custom configurations, you can modify the parameters in 
 To profile specific sections of the FMS code (e.g., the attention mechanism), follow these steps:
 
 1. Add `hpml_utils` to the Python Path
-    ```bash
-    export PYTHONPATH="/path/to/nestedtensors-for-transformers/hpml_utils:$PYTHONPATH"
-    source ~/.bashrc
-    ```
 
-    Replace `/path/to/nestedtensors-for-transformers` with the actual path of the repository.
+   ```bash
+   export PYTHONPATH="/path/to/nestedtensors-for-transformers/hpml_utils:$PYTHONPATH"
+   source ~/.bashrc
+   ```
+
+   Replace `/path/to/nestedtensors-for-transformers` with the actual path of the repository.
 
 2. Insert Profiling Code in FMS \
-    Navigate to the FMS file where you want to enable profiling and insert the following code:
+   Navigate to the FMS file where you want to enable profiling and insert the following code:
 
-    ```python
-    from hpml_utils.utils.profiler import profiler
+   ```python
+   from hpml_utils.utils.profiler import profiler
 
-    ...
+   ...
 
-    profiler.start("Attention Mechanism")
-    # x = Attention(x)
-    profiler.stop("Attention Mechanism")
-    ```
+   profiler.start("Attention Mechanism")
+   # x = Attention(x)
+   profiler.stop("Attention Mechanism")
+   ```
 
 The profiling time plot will automatically be included in the final output.
 
+## Structure of this Repository
+
+- `main.py` \
+  Manages the entire experiment pipeline, including data creation and inference execution.
+
+- `eval.py` \
+  Processes the generated output tensors and evaluates them against specified tolerance thresholds.
+
+- `time_profiling.py` \
+  Utilizes time data produced by `main.py` to generate visualizations and performance graphs.
+
+- `hpml_utils/` \
+  Contains utility modules for time profiling and Torch-specific functions. These utilities facilitate the handling of nested tensors in FMS.
 
 ## Output Directories
 
 The following directories will be generated once the script is executed:
 
-1. `data/`  
+- `data/`  
    This directory stores all calculated profiling times and the output tensors.
 
-2. `plots/`  
+- `plots/`  
    Contains the plots generated for different profiling stages.
 
-3. `log/`  
+- `log/`  
    Stores logs if PyTorch profiling is enabled. You can visualize these logs using TensorBoard by running the following command:
-   ```bash
-   tensorboard --logdir=./log
-   ```
-
+  ```bash
+  tensorboard --logdir=./log
+  ```
 
 ## Findings
 
-1. Inference Time 
+1. Inference Time
 
-    <img src="figures/inference.png" style="width:min(100%,400px)"/>
-
+<img src="figures/inference.png" style="width:min(100%,400px)"/>
 
 2. GPU Usage \
-    Padded (Top) v/s Nested (Bottom)
+   Padded (Top) v/s Nested (Bottom)
 
-    <img src="figures/gpu_padded.png" style="width:min(100%,400px)"/>
-    <img src="figures/gpu_nested.png" style="width:min(100%,400px)"/>
-
+<img src="figures/gpu_padded.png" style="width:min(100%,400px)"/>
+<img src="figures/gpu_nested.png" style="width:min(100%,400px)"/>
 
 3. Output Distribution
 
-    <img src="figures/output.png" style="width:min(100%,400px)"/>
-    <img src="figures/output_difference.png" style="width:min(100%,400px)"/>
+<img src="figures/output.png" style="width:min(100%,400px)"/>
+<img src="figures/output_difference.png" style="width:min(100%,400px)"/>
 
+A detailed analysis is available in the [report](./report.pdf).
 
 ## Team Members
 
