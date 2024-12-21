@@ -3,7 +3,7 @@ start=$(date +%s)
 
 BASEDIR=$(pwd)
 ROOT_PATH=$BASEDIR
-PYTHON_PATH=/home/kg3081/hpml_project/venv/bin/python
+PYTHON_PATH=$(dirname "$ROOT_PATH")/venv/bin/python
 MAIN_FILE=$ROOT_PATH/main.py
 EVAL_FILE=$ROOT_PATH/eval.py
 TIME_PROFILE_FILE=$ROOT_PATH/time_profiling.py
