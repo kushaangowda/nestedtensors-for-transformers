@@ -17,8 +17,8 @@ rm -rf $DATA_PATH
 # Create new folder to save data
 mkdir $DATA_PATH
 
-NUM_SAMPLES=300
-BATCH_SIZE=8
+NUM_SAMPLES=500
+BATCH_SIZE=16
 DEVICE=cuda
 MODE=nlp
 NUM_WORKERS=0

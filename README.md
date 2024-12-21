@@ -1,6 +1,7 @@
 # Nested Tensors for Transformers
 
-This project aims to implement a complete forward pass for the LLAMA model using [NestedTensors](https://pytorch.org/docs/stable/nested.html) in PyTorch. NestedTensors offer a more efficient approach to managing variable-length data, enhancing memory usage - a critical factor for large-scale inference and fine-tuning. The implementation leveraged the IBM [Foundation Model Stack (FMS)](https://github.com/foundation-model-stack/foundation-model-stack) to assess the impact of these optimizations, with the experiments conducted on standard GPUs (Nvidia L4).
+This project aims to implement a complete forward pass for the LLAMA model using [NestedTensors](https://pytorch.org/docs/stable/nested.html) in PyTorch. NestedTensors offer a more efficient approach to managing variable-length data, enhancing memory usage - a critical factor for large-scale inference and fine-tuning. 
+Building on the LLaMA micro implementation from the IBM [Foundation Model Stack (FMS)](https://github.com/foundation-model-stack/foundation-model-stack), we made it fully compatible with NestedTensors. The experiments were conducted on Nvidia A100 GPU to evaluate the impact of these optimizations.
 
 FMS PR: [https://github.com/foundation-model-stack/foundation-model-stack/pull/370](https://github.com/foundation-model-stack/foundation-model-stack/pull/370)
 
